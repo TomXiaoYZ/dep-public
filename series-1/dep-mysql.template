@@ -1,0 +1,165 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Aurora cluster template
+Parameters:
+  DBInstanceIdentifier:
+    Description: A name for the DB instance. If you specify a name, AWS CloudFormation converts it to lowercase.
+      If you don't specify a name, AWS CloudFormation generates a unique physical ID and uses that ID for the DB instance.
+    Type: String
+    MinLength: '1'
+    MaxLength: '63'
+  DBAllocatedStorage:
+    ConstraintDescription: must be between 5 and 4096 GiB. If Iops specified, AllocatedStorage
+      must be at least 100 GiB and with minimum Iops value of 1000.
+    Default: '50'
+    Description: The size of the database in gigabytes (GiB).
+    MaxValue: '4096'
+    MinValue: '5'
+    Type: Number
+  DBAutoMinorVersionUpgrade:
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Default: 'false'
+    Description: Select true/false to setup Auto Minor Version upgrade.
+    Type: String
+  DBBackupRetentionPeriod:
+    Default: '7'
+    Description: The number of days for which automatic DB snapshots are retained.
+    Type: String
+  DBInstanceClass:
+    AllowedValues:
+      - db.m6g.large
+      - db.m6g.xlarge
+      - db.m6g.2xlarge
+      - db.m6g.4xlarge
+      - db.m6g.8xlarge
+      - db.m6g.12xlarge
+      - db.m6g.16xlarge
+      - db.m5.large
+      - db.m5.xlarge
+      - db.m5.2xlarge
+      - db.m5.8xlarge
+    ConstraintDescription: Must select a valid database instance type.
+    Default: db.m5.large
+    Description: The name of the compute and memory capacity class of the Amazon mysql DB instance.
+    Type: String
+  DBIops:
+    AllowedValues:
+      - '1000'
+      - '2000'
+      - '3000'
+      - '4000'
+      - '5000'
+      - '6000'
+      - '7000'
+      - '8000'
+      - '9000'
+      - '10000'
+    ConstraintDescription: '1000 Iops min and increased in 1K increments. '
+    Default: '1000'
+    Description: DB Iops. Used only when io1 specified for the StorageType property.
+    Type: Number
+  DBMasterUsername:
+    Type: String
+  DBMasterUserPassword:
+    Type: String
+  DBMultiAZ:
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Default: 'false'
+    Description: Specifies if the database instance is a multiple Availability Zone deployment.
+    Type: String
+  DBStorageType:
+    AllowedValues:
+      - standard
+      - gp2
+      - io1
+    Default: standard
+    Description: The storage type associated with this database instance.
+    Type: String
+  CustomDBSecurityGroup:
+    Description: MySQL Security Group.
+    Type: AWS::EC2::SecurityGroup::Id
+  Subnet1ID:
+    Description: The ID of the private subnet in Availability Zone 1.
+    Type: 'AWS::EC2::Subnet::Id'
+  Subnet2ID:
+    Description: The ID of the private subnet in Availability Zone 2.
+    Type: 'AWS::EC2::Subnet::Id'
+  VPCID:
+    Description: ID of the VPC you are deploying into (e.g., vpc-0343606e).
+    Type: 'AWS::EC2::VPC::Id'
+    Default: ''
+Conditions:
+  IOPSStorageType:
+    !Equals
+    - !Ref DBStorageType
+    - io1
+Resources:
+  DBParameterGroup:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      Description: Parameter group of mysql instance
+      Family: mysql8.0
+      Parameters:
+        log_bin_trust_function_creators: 1
+
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnets available for the RDS mysql DB Instance
+      SubnetIds:
+        - !Ref Subnet1ID
+        - !Ref Subnet2ID
+
+  DBInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      AllocatedStorage: !Ref DBAllocatedStorage
+      DBInstanceClass: !Ref DBInstanceClass
+      DBInstanceIdentifier: !Ref DBInstanceIdentifier
+      Engine: mysql
+      EngineVersion: '8.0.33'
+      MasterUsername: !Ref DBMasterUsername
+      MasterUserPassword: !Ref DBMasterUserPassword
+      DBParameterGroupName: !GetAtt DBParameterGroup.DBParameterGroupName
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      VPCSecurityGroups:
+        - !Ref CustomDBSecurityGroup
+      MultiAZ: !Ref DBMultiAZ
+      StorageType: !Ref DBStorageType
+      AutoMinorVersionUpgrade: !Ref DBAutoMinorVersionUpgrade
+      BackupRetentionPeriod: !Ref DBBackupRetentionPeriod
+      Iops:
+        !If
+        - IOPSStorageType
+        - !Ref DBIops
+        - !Ref AWS::NoValue
+      Tags:
+        - Key: Name
+          Value: !Sub PostgreSQLDB-${AWS::StackName}
+
+  DBSecret:
+    Type: 'AWS::SecretsManager::Secret'
+    Properties:
+      Name: dep-db-instance-secret
+      SecretString: !Sub '{"username":"${DBMasterUsername}","password":"${DBMasterUserPassword}"}'
+
+Outputs:
+  RDSEndPoints:
+    Description: Amazon RDS Endpoint to connect
+    Value: !Sub ${DBInstance.Endpoint.Address}:${DBInstance.Endpoint.Port}
+  RDSEndPointAddress:
+    Description: Amazon RDS Endpoint to connect
+    Value: !Sub ${DBInstance.Endpoint.Address}
+  RDSEndPointPort:
+    Description: Amazon RDS Endpoint to connect
+    Value: !Sub ${DBInstance.Endpoint.Port}
+  DBInstanceArn:
+    Description: The Amazon Resource Name (ARN) for the DB instance.
+    Value: !GetAtt DBInstance.DBInstanceArn
+  DBSecretArn:
+    Description: The ARN of the secret.
+    Value: !GetAtt DBSecret.Id

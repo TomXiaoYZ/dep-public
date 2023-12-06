@@ -1,0 +1,373 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'Deploy Dep (owner: tom.xiao@hotmail.com)'
+Metadata:
+  LICENSE: Apache License Version 2.0
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    - Label:
+        default: DEP Basic Configuration
+      Parameters:
+        - EnvironmentName
+
+    - Label:
+        default: VPC Network Configuration
+      Parameters:
+        - VpcCIDR
+        - PrivateSubnet1CIDR
+        - PrivateSubnet2CIDR
+        - PublicSubnet1CIDR
+        - PublicSubnet2CIDR
+        - RemoteAccessCIDR
+        - AccessCIDR
+
+    - Label:
+        default: S3 Configuration
+      Parameters:
+        - S3BucketName
+
+    - Label:
+        default: MySQL Configuration
+      Parameters:
+        - DBAllocatedStorage
+        - DBAutoMinorVersionUpgrade
+        - DBBackupRetentionPeriod
+        - DBInstanceClass
+        - DBIops
+        - DBMasterUsername
+        - DBMasterUserPassword
+        - DBMultiAZ
+        - DBStorageType
+
+    - Label:
+        default: Ldap Configuration
+      Parameters:
+        - LdapDomainName
+        - LdapAdmin
+        - LdapAdminPassword
+
+    ParameterLabels:
+      # DEP Basic Configuration
+      EnvironmentName:
+        default: Set your Dep application name.
+
+      # VPC Network Configuration
+      VpcCIDR:
+        default: VPC CIDR.
+      PrivateSubnet1CIDR:
+        default: Private subnet 1 CIDR.
+      PrivateSubnet2CIDR:
+        default: Private subnet 2 CIDR.
+      PublicSubnet1CIDR:
+        default: Public subnet 1 CIDR.
+      PublicSubnet2CIDR:
+        default: Public subnet 2 CIDR.
+      RemoteAccessCIDR:
+        default: Allowed WebServer external access CIDR.
+      AccessCIDR:
+        default: Permitted IP range.
+
+      # S3 Configuration
+      S3BucketName:
+        default: S3 bucket name for Hive data storage.
+
+      # MySQL Configuration
+      DBAllocatedStorage:
+        default: The size of the database in gigabytes (GiB).
+      DBAutoMinorVersionUpgrade:
+        default: Select true/false to setup Auto Minor Version upgrade.
+      DBBackupRetentionPeriod:
+        default: The number of days for which automatic DB snapshots are retained.
+      DBInstanceClass:
+        default: The name of the compute and memory capacity class of the Amazon mysql DB instance.
+      DBIops:
+        default: DB Iops. Used only when io1 specified for the StorageType property.
+      DBMasterUsername:
+        default: DB admin username.
+      DBMasterUserPassword:
+        default: DB admin password.
+      DBMultiAZ:
+        default: Specifies if the database instance is a multiple Availability Zone deployment.
+      DBStorageType:
+        default: The storage type associated with this database instance.
+
+      # Secrets Manager Configuration
+      SecretsManagerTemplateUrl:
+        default: Public cloud formation url for secrets manager.
+
+      # Ldap Configuration
+      LdapDomainName:
+        default: Ldap domain name.
+      LdapAdmin:
+        default: Ldap admin username.
+      LdapAdminPassword:
+        default: Ldap admin password.
+
+Parameters:
+  # DEP Basic Configuration
+  EnvironmentName:
+    Description: Set your dep application name.
+    Default: dep
+    Type: String
+
+  # VPC Network Configuration
+  VpcCIDR:
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
+    ConstraintDescription: Must be a valid IP range in x.x.x.x/x notation
+    Default: 10.99.0.0/16
+    Description: CIDR Block for the VPC.
+    Type: String
+  PrivateSubnet1CIDR:
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
+    ConstraintDescription: Must be a valid IP range in x.x.x.x/x notation
+    Default: 10.99.128.0/20
+    Description: CIDR block for private subnet 1 located in Availability Zone 1.
+    Type: String
+  PrivateSubnet2CIDR:
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
+    ConstraintDescription: Must be a valid IP range in x.x.x.x/x notation
+    Default: 10.99.144.0/20
+    Description: CIDR block for private subnet 2 located in Availability Zone 2.
+    Type: String
+  PublicSubnet1CIDR:
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
+    ConstraintDescription: Must be a valid IP range in x.x.x.x/x notation
+    Default: 10.99.0.0/20
+    Description: CIDR Block for the public DMZ subnet 1 located in Availability Zone 1.
+    Type: String
+  PublicSubnet2CIDR:
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
+    ConstraintDescription: Must be a valid IP range in x.x.x.x/x notation
+    Default: 10.99.16.0/20
+    Description: CIDR Block for the public DMZ subnet 2 located in Availability Zone 2.
+    Type: String
+  RemoteAccessCIDR:
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/x
+    Default: 0.0.0.0/0
+    Description: Allowed CIDR block for external SSH access to the WebServers.
+    Type: String
+  AccessCIDR:
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
+    ConstraintDescription: Must be a valid IP range in x.x.x.x/x notation
+    Default: 0.0.0.0/0
+    Description: 'The CIDR IP range that is permitted to access odoo instances.
+      Note: a value of 0.0.0.0/0 will allow access from ANY ip address.'
+    Type: String
+
+  # S3 Configuration
+  S3BucketName:
+    Default: ''
+    Description: S3 bucket name for Hive data storage. By default 'dep-{AccountId}-{Region}'
+    Type: String
+
+  # MySQL Configuration
+  DBAllocatedStorage:
+    ConstraintDescription: must be between 5 and 4096 GiB. If Iops specified, AllocatedStorage
+      must be at least 100 GiB and with minimum Iops value of 1000
+    Default: '50'
+    Description: The size of the database in gigabytes (GiB)
+    MaxValue: '4096'
+    MinValue: '5'
+    Type: Number
+  DBAutoMinorVersionUpgrade:
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Default: 'false'
+    Description: Select true/false to setup Auto Minor Version upgrade
+    Type: String
+  DBBackupRetentionPeriod:
+    Default: '7'
+    Description: The number of days for which automatic DB snapshots are retained.
+    Type: String
+  DBInstanceClass:
+    AllowedValues:
+      - db.m6g.large
+      - db.m6g.xlarge
+      - db.m6g.2xlarge
+      - db.m6g.4xlarge
+      - db.m6g.8xlarge
+      - db.m6g.12xlarge
+      - db.m6g.16xlarge
+      - db.m5.large
+      - db.m5.xlarge
+      - db.m5.2xlarge
+      - db.m5.8xlarge
+    ConstraintDescription: Must select a valid database instance type.
+    Default: db.m5.large
+    Description: The name of the compute and memory capacity class of the Amazon mysql DB instance.
+    Type: String
+  DBIops:
+    AllowedValues:
+      - '1000'
+      - '2000'
+      - '3000'
+      - '4000'
+      - '5000'
+      - '6000'
+      - '7000'
+      - '8000'
+      - '9000'
+      - '10000'
+    ConstraintDescription: '1000 Iops min and increased in 1K increments. '
+    Default: '1000'
+    Description: DB Iops. Used only when io1 specified for the StorageType property
+    Type: Number
+  DBMasterUsername:
+    Default: depadmin
+    Type: String
+  DBMasterUserPassword:
+    Default: XwgAST0%Q'sgTx[
+    Type: String
+  DBMultiAZ:
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Default: 'false'
+    Description: Specifies if the database instance is a multiple Availability Zone
+      deployment.
+    Type: String
+  DBStorageType:
+    AllowedValues:
+      - standard
+      - gp2
+      - io1
+    Default: standard
+    Description: The storage type associated with this database instance
+    Type: String
+
+  # Secrets Manager Configuration
+  SecretsManagerTemplateUrl:
+    Description: Public cloud formation url for secrets manager.
+    Type: String
+
+  LdapDomainName:
+    Description: Ldap domain name.
+    Type: String
+    Default: 'dep'
+  LdapAdmin:
+    Description: Ldap admin username.
+    Type: String
+    Default: 'depadmin'
+  LdapAdminPassword:
+    Description: Ldap admin password.
+    Type: String
+    Default: 'dep123456'
+
+Conditions:
+  CustomS3BucketName: !Equals ['', !Ref S3BucketName]
+
+Resources:
+  DepVpcStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: 'https://dep-public.s3.ap-northeast-1.amazonaws.com/series-1/dep-vpc.template'
+      Parameters:
+        EnvironmentName: !Ref EnvironmentName
+        PrivateSubnet1CIDR: !Ref PrivateSubnet1CIDR
+        PrivateSubnet2CIDR: !Ref PrivateSubnet2CIDR
+        PublicSubnet1CIDR: !Ref PublicSubnet1CIDR
+        PublicSubnet2CIDR: !Ref PublicSubnet2CIDR
+        VpcCIDR: !Ref VpcCIDR
+
+  DepSecurityGroupStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - DepVpcStack
+    Properties:
+      TemplateURL: 'https://dep-public.s3.ap-northeast-1.amazonaws.com/series-1/dep-securitygroup.template'
+      Parameters:
+        EnvironmentName: !Ref EnvironmentName
+        AccessCIDR: !GetAtt DepVpcStack.Outputs.CidrBlock
+        VPCID: !GetAtt DepVpcStack.Outputs.VPC
+        VPCCIDR: !GetAtt DepVpcStack.Outputs.CidrBlock
+
+  DepS3Stack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: 'https://dep-public.s3.ap-northeast-1.amazonaws.com/series-1/dep-s3.template'
+      Parameters:
+        BucketName: !If [CustomS3BucketName, !Ref S3BucketName, !Join ['-', [!Ref EnvironmentName, !Ref AWS::AccountId, !Ref AWS::Region]]]
+
+  DepIamStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - DepS3Stack
+    Properties:
+      TemplateURL: 'https://dep-public.s3.ap-northeast-1.amazonaws.com/series-1/dep-iam.template'
+      Parameters:
+        EnvironmentName: !Ref EnvironmentName
+        S3BucketName: !GetAtt DepS3Stack.Outputs.BucketName
+
+  DepEc2SshKeyPair:
+    Type: AWS::EC2::KeyPair
+    Properties:
+      KeyName: !Sub ${EnvironmentName}-eks-worker-key-pair
+
+  # Enable third-party cloudformation extension to manage eks cluster
+  DepCloudformationExtensionsStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: 'https://dep-public.s3.ap-northeast-1.amazonaws.com/series-1/dep-extensions.template'
+
+  DepDBInstanceStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - DepVpcStack
+      - DepSecurityGroupStack
+    Properties:
+      TemplateURL: 'https://dep-public.s3.ap-northeast-1.amazonaws.com/series-1/dep-mysql.template'
+      Parameters:
+        DBInstanceIdentifier: !Join
+          - '-'
+          - - !Ref EnvironmentName
+            - mysql
+        DBAllocatedStorage: !Ref DBAllocatedStorage
+        DBAutoMinorVersionUpgrade: !Ref DBAutoMinorVersionUpgrade
+        DBBackupRetentionPeriod: !Ref DBBackupRetentionPeriod
+        DBInstanceClass: !Ref DBInstanceClass
+        DBIops: !Ref DBIops
+        DBMasterUsername: !Ref DBMasterUsername
+        DBMasterUserPassword: !Ref DBMasterUserPassword
+        DBMultiAZ: !Ref DBMultiAZ
+        DBStorageType: !Ref DBStorageType
+        CustomDBSecurityGroup: !GetAtt DepSecurityGroupStack.Outputs.MySQLRDSSecurityGroup
+        Subnet1ID: !GetAtt DepVpcStack.Outputs.PublicSubnet1
+        Subnet2ID: !GetAtt DepVpcStack.Outputs.PublicSubnet2
+        VPCID: !GetAtt DepVpcStack.Outputs.VPC
+
+    DepEksStack:
+      Type: AWS::CloudFormation::Stack
+      DependsOn:
+        - DepVpcStack
+        - DepSecurityGroupStack
+        - DepIamStack
+        - DepCloudformationExtensionsStack
+        - DepDBInstanceStack
+      Properties:
+        TemplateURL: 'https://dep-public.s3.ap-northeast-1.amazonaws.com/series-1/dep-eks.template'
+        Parameters:
+          EnvironmentName: !Ref EnvironmentName
+          LambdaRoleArn: !GetAtt DepIamStack.Outputs.DepLambdaIamRole
+          ClusterRoleArn: !GetAtt DepIamStack.Outputs.DepIamRole
+          WorkerRoleArn: !GetAtt DepIamStack.Outputs.DepEksWorkerIamRole
+          SecurityGroupIds: !GetAtt DepSecurityGroupStack.Outputs.EKSSecurityGroup
+          PrivateSubnet1Id: !GetAtt DepVpcStack.Outputs.PrivateSubnet1
+          PrivateSubnet2Id: !GetAtt DepVpcStack.Outputs.PrivateSubnet2
+          PublicSubnet1Id: !GetAtt DepVpcStack.Outputs.PublicSubnet1
+          PublicSubnet2Id: !GetAtt DepVpcStack.Outputs.PublicSubnet2
+          VpcCIDR: !Ref VpcCIDR
+          AmiType: 'AL2_ARM_64'
+          CapacityType: 'SPOT'
+          InstanceTypes: 'm6g.large'
+          Ec2SshKey: !Ref DepEc2SshKeyPair
+          DbEndpoint: !GetAtt DepDBInstanceStack.Outputs.RDSEndPointAddress
+          DbPort: !GetAtt DepDBInstanceStack.Outputs.RDSEndPointPort
+          DbUserName: !Ref DBMasterUsername
+          DbUserPassword: !Ref DBMasterUserPassword
+          S3BucketName: !GetAtt DepS3Stack.Outputs.BucketName
+          LdapDomainName: !Ref LdapDomainName
+          LdapAdmin: !Ref LdapAdmin
+          LdapAdminPassword: !Ref LdapAdminPassword

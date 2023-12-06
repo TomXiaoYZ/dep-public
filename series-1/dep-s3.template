@@ -1,0 +1,26 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'Create Dep S3 Bucket'
+Parameters:
+  # S3 Configuration
+  BucketName:
+    Type: String
+Resources:
+  DepS3:
+    Type: 'AWS::S3::Bucket'
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: !Ref BucketName
+      LifecycleConfiguration:
+        Rules:
+            - Id: IntelligentTieringTransition
+              Status: Enabled
+              Transitions:
+                - TransitionInDays: 7
+                  StorageClass: INTELLIGENT_TIERING
+            - Id: NoncurrentVersionExpirationInDays
+              Status: Enabled
+              NoncurrentVersionExpirationInDays: 1
+Outputs:
+  BucketName:
+    Description: S3 Bucket Name
+    Value: !Ref DepS3
