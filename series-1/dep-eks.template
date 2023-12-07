@@ -143,9 +143,9 @@ Resources:
         SourceSecurityGroups:
           - !Ref SecurityGroupIds
       ScalingConfig:
-        DesiredSize: 2
-        MaxSize: 10
-        MinSize: 2
+        DesiredSize: 1
+        MaxSize: 5
+        MinSize: 1
       Subnets:
         - !Ref PublicSubnet1Id
         - !Ref PublicSubnet2Id
@@ -178,9 +178,9 @@ Resources:
         SourceSecurityGroups:
           - !Ref SecurityGroupIds
       ScalingConfig:
-        DesiredSize: 5
-        MaxSize: 20
-        MinSize: 5
+        DesiredSize: 1
+        MaxSize: 5
+        MinSize: 1
       Subnets:
         - !Ref PublicSubnet1Id
         - !Ref PublicSubnet2Id
@@ -213,9 +213,9 @@ Resources:
         SourceSecurityGroups:
           - !Ref SecurityGroupIds
       ScalingConfig:
-        DesiredSize: 2
-        MaxSize: 10
-        MinSize: 2
+        DesiredSize: 1
+        MaxSize: 5
+        MinSize: 1
       Subnets:
         - !Ref PublicSubnet1Id
         - !Ref PublicSubnet2Id
