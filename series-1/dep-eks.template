@@ -258,6 +258,107 @@ Resources:
         provisioner: ebs.csi.aws.com
         volumeBindingMode: WaitForFirstConsumer
 
+  OpenldapService:
+    Type: AWSQS::Kubernetes::Helm
+    DependsOn:
+      - EbsCsiAddon
+      - EksCluster
+      - ClusterNamespace
+      - PlatformNodeGroup
+      - EbsStorageClass
+    Properties:
+      ClusterID: !Ref EksCluster
+      Repository: https://tomxiaoyz.github.io/big-data-platform-public/
+      Chart: dep/openldap
+      Namespace: platform
+      Name: openldap
+      Version: 1.0.0
+      ValueYaml: !Sub |
+        global:
+          ldapDomain: dc=${LdapDomainName},dc=com
+          adminUser: ${LdapAdmin}
+          adminPassword: ${LdapAdminPassword}
+          configUserEnabled: true
+          configUser: ${LdapAdmin}
+          configPassword: ${LdapAdminPassword}
+        persistence:
+          storageClass: ebs-sc
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+                - matchExpressions:
+                    - key: nodegroup
+                      operator: In
+                      values:
+                        - platform
+
+  RangerService:
+    Type: AWSQS::Kubernetes::Helm
+    DependsOn:
+      - EbsCsiAddon
+      - EksCluster
+      - ClusterNamespace
+      - PlatformNodeGroup
+      - OpenldapService
+    Properties:
+      ClusterID: !Ref EksCluster
+      Repository: https://tomxiaoyz.github.io/big-data-platform-public/
+      Chart: dep/ranger
+      Namespace: platform
+      Name: ranger
+      Version: 1.0.0
+      ValueYaml: !Sub |
+        env:
+          admin:
+            DB_HOST: ${DbEndpoint}
+            DB_ROOT_USER: ${DbUserName}
+            DB_ROOT_PASSWORD: ${DbUserPassword}
+            DB_NAME: ranger
+            DB_USER: ${DbUserName}
+            DB_PASSWORD: ${DbUserPassword}
+            AUDIT_SOLR_URLS: http://ranger-solr.platform.svc.cluster.local:8983/solr/ranger_audits
+            POLICYMGR_EXTERNAL_URL: http://ranger-admin.platform.svc.cluster.local:6080
+            XA_LDAP_URL: ldap://openldap.platform.svc.cluster.local:389
+            XA_LDAP_BASE_DN: dc=${LdapDomainName},dc=com
+            XA_LDAP_BIND_DN: cn=${LdapAdmin},dc=${LdapDomainName},dc=com
+            XA_LDAP_BIND_PASSWORD: ${LdapAdminPassword}
+          usersync:
+            POLICY_MGR_URL: http://ranger-admin.platform.svc.cluster.local:6080
+            SYNC_SOURCE: ldap
+            SYNC_LDAP_URL: http://openldap.platform.svc.cluster.local:389
+            SYNC_LDAP_BIND_DN: cn=${LdapAdmin},dc=${LdapDomainName},dc=com
+            SYNC_LDAP_BIND_PASSWORD: ${LdapAdminPassword}
+            SYNC_LDAP_SEARCH_BASE: dc=${LdapDomainName},dc=com
+            SYNC_LDAP_USER_SEARCH_BASE: ou=People,dc=${LdapDomainName},dc=com
+            SYNC_LDAP_USER_NAME_ATTRIBUTE: uid   
+
+  ZookeeperService:
+    Type: AWSQS::Kubernetes::Helm
+    DependsOn:
+      - EbsCsiAddon
+      - EksCluster
+      - ClusterNamespace
+      - HadoopNodeGroup
+    Properties:
+      ClusterID: !Ref EksCluster
+      Repository: https://charts.bitnami.com/bitnami
+      Chart: bitnami/zookeeper
+      Namespace: hadoop
+      Name: zookeeper
+      ValueYaml: |
+        persistence:
+          storageClass: ebs-sc
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+                - matchExpressions:
+                    - key: nodegroup
+                      operator: In
+                      values:
+                        - hadoop
+
 Outputs:
   Arn:
     Description: The ARN of the cluster, such as arn:aws:eks:us-west-2:666666666666:cluster/prod.
