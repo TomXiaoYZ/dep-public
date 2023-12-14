@@ -102,6 +102,10 @@ Resources:
           - Arn: !Ref WorkerRoleArn
             Username: "Worker"
             Groups: [ "system:masters", "kube-system:aws-auth", "system:nodes" ]
+          ## Temporary use
+          - Arn: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:user/tomxiao"
+            Username: "CliUser"
+            Groups: [ "system:masters", "kube-system:aws-auth" ]
       Tags:
         - Key: ClusterName
           Value: !Join
@@ -140,8 +144,8 @@ Resources:
       NodeRole: !Ref WorkerRoleArn
       RemoteAccess:
         Ec2SshKey: !Ref Ec2SshKey
-        SourceSecurityGroups:
-          - !Ref SecurityGroupIds
+#        SourceSecurityGroups:
+#          - !Ref SecurityGroupIds
       ScalingConfig:
         DesiredSize: 1
         MaxSize: 5
@@ -152,75 +156,75 @@ Resources:
       Labels:
         nodegroup: platform
 
-  HadoopNodeGroup:
-    Type: AWS::EKS::Nodegroup
-    Properties:
-      AmiType: !Ref AmiType
-      CapacityType: !Ref CapacityType
-      ClusterName: !Ref EksCluster
-      DiskSize: !Ref DiskSize
-      ForceUpdateEnabled: !Ref ForceUpdateEnabled
-      InstanceTypes:
-        - m6g.large
-        - m6g.xlarge
-        - m6g.2xlarge
-        - m6g.4xlarge
-        - r6g.2xlarge
-        - c6g.2xlarge
-        - c6gd.2xlarge
-        - c6g.large
-        - c6g.xlarge
-        - c6gn.xlarge
-      NodegroupName: hadoop
-      NodeRole: !Ref WorkerRoleArn
-      RemoteAccess:
-        Ec2SshKey: !Ref Ec2SshKey
-        SourceSecurityGroups:
-          - !Ref SecurityGroupIds
-      ScalingConfig:
-        DesiredSize: 1
-        MaxSize: 5
-        MinSize: 1
-      Subnets:
-        - !Ref PublicSubnet1Id
-        - !Ref PublicSubnet2Id
-      Labels:
-        nodegroup: hadoop
-
-  TrinoNodeGroup:
-    Type: AWS::EKS::Nodegroup
-    Properties:
-      AmiType: !Ref AmiType
-      CapacityType: !Ref CapacityType
-      ClusterName: !Ref EksCluster
-      DiskSize: !Ref DiskSize
-      ForceUpdateEnabled: !Ref ForceUpdateEnabled
-      InstanceTypes:
-        - m6g.large
-        - m6g.xlarge
-        - m6g.2xlarge
-        - m6g.4xlarge
-        - r6g.2xlarge
-        - c6g.2xlarge
-        - c6gd.2xlarge
-        - c6g.large
-        - c6g.xlarge
-        - c6gn.xlarge
-      NodegroupName: trino
-      NodeRole: !Ref WorkerRoleArn
-      RemoteAccess:
-        Ec2SshKey: !Ref Ec2SshKey
-        SourceSecurityGroups:
-          - !Ref SecurityGroupIds
-      ScalingConfig:
-        DesiredSize: 1
-        MaxSize: 5
-        MinSize: 1
-      Subnets:
-        - !Ref PublicSubnet1Id
-        - !Ref PublicSubnet2Id
-      Labels:
-        nodegroup: trino
+#  HadoopNodeGroup:
+#    Type: AWS::EKS::Nodegroup
+#    Properties:
+#      AmiType: !Ref AmiType
+#      CapacityType: !Ref CapacityType
+#      ClusterName: !Ref EksCluster
+#      DiskSize: !Ref DiskSize
+#      ForceUpdateEnabled: !Ref ForceUpdateEnabled
+#      InstanceTypes:
+#        - m6g.large
+#        - m6g.xlarge
+#        - m6g.2xlarge
+#        - m6g.4xlarge
+#        - r6g.2xlarge
+#        - c6g.2xlarge
+#        - c6gd.2xlarge
+#        - c6g.large
+#        - c6g.xlarge
+#        - c6gn.xlarge
+#      NodegroupName: hadoop
+#      NodeRole: !Ref WorkerRoleArn
+#      RemoteAccess:
+#        Ec2SshKey: !Ref Ec2SshKey
+#        SourceSecurityGroups:
+#          - !Ref SecurityGroupIds
+#      ScalingConfig:
+#        DesiredSize: 1
+#        MaxSize: 5
+#        MinSize: 1
+#      Subnets:
+#        - !Ref PublicSubnet1Id
+#        - !Ref PublicSubnet2Id
+#      Labels:
+#        nodegroup: hadoop
+#
+#  TrinoNodeGroup:
+#    Type: AWS::EKS::Nodegroup
+#    Properties:
+#      AmiType: !Ref AmiType
+#      CapacityType: !Ref CapacityType
+#      ClusterName: !Ref EksCluster
+#      DiskSize: !Ref DiskSize
+#      ForceUpdateEnabled: !Ref ForceUpdateEnabled
+#      InstanceTypes:
+#        - m6g.large
+#        - m6g.xlarge
+#        - m6g.2xlarge
+#        - m6g.4xlarge
+#        - r6g.2xlarge
+#        - c6g.2xlarge
+#        - c6gd.2xlarge
+#        - c6g.large
+#        - c6g.xlarge
+#        - c6gn.xlarge
+#      NodegroupName: trino
+#      NodeRole: !Ref WorkerRoleArn
+#      RemoteAccess:
+#        Ec2SshKey: !Ref Ec2SshKey
+#        SourceSecurityGroups:
+#          - !Ref SecurityGroupIds
+#      ScalingConfig:
+#        DesiredSize: 1
+#        MaxSize: 5
+#        MinSize: 1
+#      Subnets:
+#        - !Ref PublicSubnet1Id
+#        - !Ref PublicSubnet2Id
+#      Labels:
+#        nodegroup: trino
 
   ClusterNamespace:
     Type: AWSQS::Kubernetes::Resource
@@ -293,170 +297,170 @@ Resources:
                       values:
                         - platform
 
-  RangerService:
-    Type: AWSQS::Kubernetes::Helm
-    DependsOn:
-      - EbsCsiAddon
-      - EksCluster
-      - ClusterNamespace
-      - PlatformNodeGroup
-      - OpenldapService
-    Properties:
-      ClusterID: !Ref EksCluster
-      Repository: https://tomxiaoyz.github.io/big-data-platform-public/
-      Chart: dep/ranger
-      Namespace: platform
-      Name: ranger
-      Version: 1.0.0
-      ValueYaml: !Sub |
-        env:
-          admin:
-            DB_HOST: ${DbEndpoint}
-            DB_ROOT_USER: ${DbUserName}
-            DB_ROOT_PASSWORD: ${DbUserPassword}
-            DB_NAME: ranger
-            DB_USER: ${DbUserName}
-            DB_PASSWORD: ${DbUserPassword}
-            AUDIT_SOLR_URLS: http://ranger-solr.platform.svc.cluster.local:8983/solr/ranger_audits
-            POLICYMGR_EXTERNAL_URL: http://ranger-admin.platform.svc.cluster.local:6080
-            XA_LDAP_URL: ldap://openldap.platform.svc.cluster.local:389
-            XA_LDAP_BASE_DN: dc=${LdapDomainName},dc=com
-            XA_LDAP_BIND_DN: cn=${LdapAdmin},dc=${LdapDomainName},dc=com
-            XA_LDAP_BIND_PASSWORD: ${LdapAdminPassword}
-          usersync:
-            POLICY_MGR_URL: http://ranger-admin.platform.svc.cluster.local:6080
-            SYNC_SOURCE: ldap
-            SYNC_LDAP_URL: http://openldap.platform.svc.cluster.local:389
-            SYNC_LDAP_BIND_DN: cn=${LdapAdmin},dc=${LdapDomainName},dc=com
-            SYNC_LDAP_BIND_PASSWORD: ${LdapAdminPassword}
-            SYNC_LDAP_SEARCH_BASE: dc=${LdapDomainName},dc=com
-            SYNC_LDAP_USER_SEARCH_BASE: ou=People,dc=${LdapDomainName},dc=com
-            SYNC_LDAP_USER_NAME_ATTRIBUTE: uid   
+#  RangerService:
+#    Type: AWSQS::Kubernetes::Helm
+#    DependsOn:
+#      - EbsCsiAddon
+#      - EksCluster
+#      - ClusterNamespace
+#      - PlatformNodeGroup
+#      - OpenldapService
+#    Properties:
+#      ClusterID: !Ref EksCluster
+#      Repository: https://tomxiaoyz.github.io/big-data-platform-public/
+#      Chart: dep/ranger
+#      Namespace: platform
+#      Name: ranger
+#      Version: 1.0.0
+#      ValueYaml: !Sub |
+#        env:
+#          admin:
+#            DB_HOST: ${DbEndpoint}
+#            DB_ROOT_USER: ${DbUserName}
+#            DB_ROOT_PASSWORD: ${DbUserPassword}
+#            DB_NAME: ranger
+#            DB_USER: ${DbUserName}
+#            DB_PASSWORD: ${DbUserPassword}
+#            AUDIT_SOLR_URLS: http://ranger-solr.platform.svc.cluster.local:8983/solr/ranger_audits
+#            POLICYMGR_EXTERNAL_URL: http://ranger-admin.platform.svc.cluster.local:6080
+#            XA_LDAP_URL: ldap://openldap.platform.svc.cluster.local:389
+#            XA_LDAP_BASE_DN: dc=${LdapDomainName},dc=com
+#            XA_LDAP_BIND_DN: cn=${LdapAdmin},dc=${LdapDomainName},dc=com
+#            XA_LDAP_BIND_PASSWORD: ${LdapAdminPassword}
+#          usersync:
+#            POLICY_MGR_URL: http://ranger-admin.platform.svc.cluster.local:6080
+#            SYNC_SOURCE: ldap
+#            SYNC_LDAP_URL: http://openldap.platform.svc.cluster.local:389
+#            SYNC_LDAP_BIND_DN: cn=${LdapAdmin},dc=${LdapDomainName},dc=com
+#            SYNC_LDAP_BIND_PASSWORD: ${LdapAdminPassword}
+#            SYNC_LDAP_SEARCH_BASE: dc=${LdapDomainName},dc=com
+#            SYNC_LDAP_USER_SEARCH_BASE: ou=People,dc=${LdapDomainName},dc=com
+#            SYNC_LDAP_USER_NAME_ATTRIBUTE: uid
 
-  HiveMetastoreService:
-    Type: AWSQS::Kubernetes::Helm
-    DependsOn:
-      - EbsCsiAddon
-      - EksCluster
-      - ClusterNamespace
-      - HadoopNodeGroup
-    Properties:
-      ClusterID: !Ref EksCluster
-      Repository: https://tomxiaoyz.github.io/big-data-platform-public/
-      Chart: dep/hive-metastore
-      Version: 1.0.0
-      Namespace: hadoop
-      Name: hive-metastore
-      ValueYaml: !Sub |
-        env:
-          HIVE_DB_JDBC_URL: "jdbc:mysql://${DbEndpoint}:${DbPort}/hive"
-          HIVE_DB_USER: "${DbUserName}"
-          HIVE_DB_PASS: "${DbUserPassword}"
-          HIVE_WAREHOUSE_S3LOCATION: "s3://${S3BucketName}/hive/"
-
-  HadoopService:
-    Type: AWSQS::Kubernetes::Helm
-    DependsOn:
-      - EbsCsiAddon
-      - EksCluster
-      - ClusterNamespace
-      - HadoopNodeGroup
-      - HiveMetastoreService
-      - OpenldapService
-    Properties:
-      ClusterID: !Ref EksCluster
-      Repository: https://tomxiaoyz.github.io/big-data-platform-public/
-      Chart: dep/hadoop
-      Namespace: hadoop
-      Name: hadoop
-      Version: 1.0.0
-      ValueYaml: !Sub |
-        ldap:
-          url: ldap://openldap.platform.svc.cluster.local:389
-          bind_dn: cn=${LdapAdmin},dc=${LdapDomainName},dc=com
-          bind_password: ${LdapAdminPassword}
-        hive:
-          mysql:
-            endpoint: ${DbEndpoint}
-            database: hive
-            port: ${DbPort}
-            username: ${DbUserName}
-            password: ${DbUserPassword}
-          warehouse:
-            location: s3://${S3BucketName}/hive/
-
-  ZookeeperService:
-    Type: AWSQS::Kubernetes::Helm
-    DependsOn:
-      - EbsCsiAddon
-      - EksCluster
-      - ClusterNamespace
-      - HadoopNodeGroup
-    Properties:
-      ClusterID: !Ref EksCluster
-      Repository: https://charts.bitnami.com/bitnami
-      Chart: bitnami/zookeeper
-      Namespace: hadoop
-      Name: zookeeper
-      ValueYaml: |
-        persistence:
-          storageClass: ebs-sc
-        affinity:
-          nodeAffinity:
-            requiredDuringSchedulingIgnoredDuringExecution:
-              nodeSelectorTerms:
-                - matchExpressions:
-                    - key: nodegroup
-                      operator: In
-                      values:
-                        - hadoop
-
-  TrinoService:
-    Type: AWSQS::Kubernetes::Helm
-    DependsOn:
-      - EbsCsiAddon
-      - EksCluster
-      - ClusterNamespace
-      - TrinoNodeGroup
-      - OpenldapService
-    Properties:
-      ClusterID: !Ref EksCluster
-      Repository: https://tomxiaoyz.github.io/big-data-platform-public/
-      Chart: dep/trino
-      Namespace: trino
-      Name: trino
-      Version: 1.0.0
-      ValueYaml: !Sub |
-        additionalCatalogs:
-          hive: |-
-            hive.metastore-refresh-interval=1m
-            connector.name=hive
-            hive.metastore-cache-ttl=60s
-            hive.metastore=thrift
-            hive.metastore.uri=thrift://hive-metastore.hadoop.svc.cluster.local:9083
-            hive.non-managed-table-writes-enabled=true
-            hive.hdfs.impersonation.enabled=true
-            hive.recursive-directories=true
-            hive.allow-drop-table=true
-            hive.parquet.use-column-names=true
-            hive.max-partitions-per-writers=3000
-            parquet.ignore-statistics=true
-            hive.allow-rename-table=true
-        server:
-          config:
-            authenticationType: "LDAP"
-        additionalConfigProperties:
-          - retry-policy=TASK
-          - query.remote-task.max-error-duration=10m
-          - task-retry-attempts-per-task=3
-          - retry-initial-delay=10s
-          - retry-max-delay=1m
-          - retry-delay-scale-factor=2.0
-          - fault-tolerant-execution-task-descriptor-storage-max-memory=10GB
-          - internal-communication.shared-secret=${AWS::StackId}
-        ldap:
-          url: "ldap://openldap.platform.svc.cluster.local:389"
-          domain_name: "${LdapDomainName}"
+#  HiveMetastoreService:
+#    Type: AWSQS::Kubernetes::Helm
+#    DependsOn:
+#      - EbsCsiAddon
+#      - EksCluster
+#      - ClusterNamespace
+#      - HadoopNodeGroup
+#    Properties:
+#      ClusterID: !Ref EksCluster
+#      Repository: https://tomxiaoyz.github.io/big-data-platform-public/
+#      Chart: dep/hive-metastore
+#      Version: 1.0.0
+#      Namespace: hadoop
+#      Name: hive-metastore
+#      ValueYaml: !Sub |
+#        env:
+#          HIVE_DB_JDBC_URL: "jdbc:mysql://${DbEndpoint}:${DbPort}/hive"
+#          HIVE_DB_USER: "${DbUserName}"
+#          HIVE_DB_PASS: "${DbUserPassword}"
+#          HIVE_WAREHOUSE_S3LOCATION: "s3://${S3BucketName}/hive/"
+#
+#  HadoopService:
+#    Type: AWSQS::Kubernetes::Helm
+#    DependsOn:
+#      - EbsCsiAddon
+#      - EksCluster
+#      - ClusterNamespace
+#      - HadoopNodeGroup
+#      - HiveMetastoreService
+#      - OpenldapService
+#    Properties:
+#      ClusterID: !Ref EksCluster
+#      Repository: https://tomxiaoyz.github.io/big-data-platform-public/
+#      Chart: dep/hadoop
+#      Namespace: hadoop
+#      Name: hadoop
+#      Version: 1.0.0
+#      ValueYaml: !Sub |
+#        ldap:
+#          url: ldap://openldap.platform.svc.cluster.local:389
+#          bind_dn: cn=${LdapAdmin},dc=${LdapDomainName},dc=com
+#          bind_password: ${LdapAdminPassword}
+#        hive:
+#          mysql:
+#            endpoint: ${DbEndpoint}
+#            database: hive
+#            port: ${DbPort}
+#            username: ${DbUserName}
+#            password: ${DbUserPassword}
+#          warehouse:
+#            location: s3://${S3BucketName}/hive/
+#
+#  ZookeeperService:
+#    Type: AWSQS::Kubernetes::Helm
+#    DependsOn:
+#      - EbsCsiAddon
+#      - EksCluster
+#      - ClusterNamespace
+#      - HadoopNodeGroup
+#    Properties:
+#      ClusterID: !Ref EksCluster
+#      Repository: https://charts.bitnami.com/bitnami
+#      Chart: bitnami/zookeeper
+#      Namespace: hadoop
+#      Name: zookeeper
+#      ValueYaml: |
+#        persistence:
+#          storageClass: ebs-sc
+#        affinity:
+#          nodeAffinity:
+#            requiredDuringSchedulingIgnoredDuringExecution:
+#              nodeSelectorTerms:
+#                - matchExpressions:
+#                    - key: nodegroup
+#                      operator: In
+#                      values:
+#                        - hadoop
+#
+#  TrinoService:
+#    Type: AWSQS::Kubernetes::Helm
+#    DependsOn:
+#      - EbsCsiAddon
+#      - EksCluster
+#      - ClusterNamespace
+#      - TrinoNodeGroup
+#      - OpenldapService
+#    Properties:
+#      ClusterID: !Ref EksCluster
+#      Repository: https://tomxiaoyz.github.io/big-data-platform-public/
+#      Chart: dep/trino
+#      Namespace: trino
+#      Name: trino
+#      Version: 1.0.0
+#      ValueYaml: !Sub |
+#        additionalCatalogs:
+#          hive: |-
+#            hive.metastore-refresh-interval=1m
+#            connector.name=hive
+#            hive.metastore-cache-ttl=60s
+#            hive.metastore=thrift
+#            hive.metastore.uri=thrift://hive-metastore.hadoop.svc.cluster.local:9083
+#            hive.non-managed-table-writes-enabled=true
+#            hive.hdfs.impersonation.enabled=true
+#            hive.recursive-directories=true
+#            hive.allow-drop-table=true
+#            hive.parquet.use-column-names=true
+#            hive.max-partitions-per-writers=3000
+#            parquet.ignore-statistics=true
+#            hive.allow-rename-table=true
+#        server:
+#          config:
+#            authenticationType: "LDAP"
+#        additionalConfigProperties:
+#          - retry-policy=TASK
+#          - query.remote-task.max-error-duration=10m
+#          - task-retry-attempts-per-task=3
+#          - retry-initial-delay=10s
+#          - retry-max-delay=1m
+#          - retry-delay-scale-factor=2.0
+#          - fault-tolerant-execution-task-descriptor-storage-max-memory=10GB
+#          - internal-communication.shared-secret=${AWS::StackId}
+#        ldap:
+#          url: "ldap://openldap.platform.svc.cluster.local:389"
+#          domain_name: "${LdapDomainName}"
 
 Outputs:
   Arn:

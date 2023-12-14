@@ -92,10 +92,6 @@ Metadata:
       DBStorageType:
         default: The storage type associated with this database instance.
 
-      # Secrets Manager Configuration
-      SecretsManagerTemplateUrl:
-        default: Public cloud formation url for secrets manager.
-
       # Ldap Configuration
       LdapDomainName:
         default: Ldap domain name.
@@ -219,7 +215,7 @@ Parameters:
     Default: depadmin
     Type: String
   DBMasterUserPassword:
-    Default: XwgAST0%Q'sgTx[
+    Default: XwgAST0%QsgTx[
     Type: String
   DBMultiAZ:
     AllowedValues:
@@ -238,11 +234,6 @@ Parameters:
     Description: The storage type associated with this database instance
     Type: String
 
-  # Secrets Manager Configuration
-  SecretsManagerTemplateUrl:
-    Description: Public cloud formation url for secrets manager.
-    Type: String
-
   LdapDomainName:
     Description: Ldap domain name.
     Type: String
@@ -257,7 +248,7 @@ Parameters:
     Default: 'dep123456'
 
 Conditions:
-  CustomS3BucketName: !Equals ['', !Ref S3BucketName]
+  CustomS3BucketName: !Not [!Equals ['', !Ref S3BucketName]]
 
 Resources:
   DepVpcStack:
@@ -371,3 +362,71 @@ Resources:
         LdapDomainName: !Ref LdapDomainName
         LdapAdmin: !Ref LdapAdmin
         LdapAdminPassword: !Ref LdapAdminPassword
+
+
+# Use lambda function to initialize database
+  LambdaLayer:
+    Type: AWS::Lambda::LayerVersion
+    Properties:
+      CompatibleRuntimes:
+        - python3.7
+      Content:
+        S3Bucket: dep-public
+        S3Key: lambda/python.zip
+      LayerName: !Join
+        - '-'
+        - - !Ref EnvironmentName
+          - lambda-layer
+      LicenseInfo: MIT
+
+  DbInitLambdaFunctionStack:
+    Type: AWS::Lambda::Function
+    DependsOn:
+      - DepIamStack
+      - DepDBInstanceStack
+      - LambdaLayer
+    Properties:
+      Handler: index.handler
+      Description: Dep database initialization.
+      Runtime: python3.7
+      FunctionName: !Sub ${EnvironmentName}-db-init-lambda-function
+      Role: !GetAtt DepIamStack.Outputs.DepIamRole
+      Timeout: 60
+      Layers:
+        - !Ref LambdaLayer
+      VpcConfig:
+        SecurityGroupIds:
+          - !GetAtt DepSecurityGroupStack.Outputs.EKSSecurityGroup
+        SubnetIds:
+          - !GetAtt DepVpcStack.Outputs.PrivateSubnet1
+          - !GetAtt DepVpcStack.Outputs.PrivateSubnet2
+          - !GetAtt DepVpcStack.Outputs.PublicSubnet1
+          - !GetAtt DepVpcStack.Outputs.PublicSubnet2
+      Code:
+        S3Bucket: dep-public
+        S3Key: lambda/db_init_lambda.zip
+      Environment:
+        Variables:
+          RDS_ENDPOINT: !GetAtt DepDBInstanceStack.Outputs.RDSEndPointAddress
+          USERNAME: !Ref DBMasterUsername
+          PASSWORD: !Ref DBMasterUserPassword
+
+  LambdaInvokerStack:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      Runtime: nodejs16.x
+      FunctionName: !Sub ${EnvironmentName}-invoker-lambda-function
+      CodeUri: s3://dep-public/lambda/invoker_lambda.zip
+      Description: Invoke a function to create a log stream.
+      MemorySize: 128
+      Timeout: 8
+      Role: !GetAtt DepIamStack.Outputs.DepIamRole
+      Tracing: Active
+
+  CustomInvoker:
+    Type: AWS::CloudFormation::CustomResource
+    Version: "1.0"
+    Properties:
+      ServiceToken: !GetAtt LambdaInvokerStack.Arn
+      FunctionName: !Ref DbInitLambdaFunctionStack
