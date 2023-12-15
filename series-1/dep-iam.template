@@ -102,6 +102,20 @@ Resources:
                   - "kms:CreateGrant"
                 Effect: Allow
                 Resource: "*"
+        - PolicyName: EksAutoScaling
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - "autoscaling:DescribeAutoScalingGroups"
+                  - "autoscaling:DescribeAutoScalingInstances"
+                  - "autoscaling:DescribeLaunchConfigurations"
+                  - "autoscaling:DescribeTags"
+                  - "autoscaling:SetDesiredCapacity"
+                  - "autoscaling:TerminateInstanceInAutoScalingGroup"
+                  - "ec2:DescribeLaunchTemplateVersions"
+                Effect: Allow
+                Resource: "*"
 
   DepEksWorkerIamRole:
     Type: AWS::IAM::Role

@@ -262,6 +262,26 @@ Resources:
         provisioner: ebs.csi.aws.com
         volumeBindingMode: WaitForFirstConsumer
 
+  ClusterAutoscaler:
+    Type: AWSQS::Kubernetes::Helm
+    DependsOn:
+      - EbsCsiAddon
+      - EksCluster
+      - ClusterNamespace
+      - PlatformNodeGroup
+      - HadoopNodeGroup
+      - TrinoNodeGroup
+    Properties:
+      ClusterID: !Ref EksCluster
+      Repository: https://tomxiaoyz.github.io/big-data-platform-public/
+      Chart: dep/cluster-autoscaler
+      Namespace: kube-system
+      Name: cluster-autoscaler
+      Version: 1.0.0
+      ValueYaml: !Sub |
+        autoDiscovery:
+          clusterName: ${EnvironmentName}-eks-cluster-${AWS::Region}
+
   OpenldapService:
     Type: AWSQS::Kubernetes::Helm
     DependsOn:
