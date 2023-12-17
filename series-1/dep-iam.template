@@ -199,6 +199,7 @@ Resources:
                   - "autoscaling:DescribeTags"
                   - "autoscaling:SetDesiredCapacity"
                   - "autoscaling:TerminateInstanceInAutoScalingGroup"
+                  - "eks:DescribeNodegroup"
                 Effect: Allow
                 Resource: "*"
 

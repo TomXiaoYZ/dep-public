@@ -182,9 +182,9 @@ Resources:
 #        SourceSecurityGroups:
 #          - !Ref SecurityGroupIds
       ScalingConfig:
-        DesiredSize: 1
+        DesiredSize: 2
         MaxSize: 5
-        MinSize: 1
+        MinSize: 2
       Subnets:
         - !Ref PublicSubnet1Id
         - !Ref PublicSubnet2Id
@@ -281,6 +281,7 @@ Resources:
       ValueYaml: !Sub |
         autoDiscovery:
           clusterName: ${EnvironmentName}-eks-cluster-${AWS::Region}
+        awsRegion: ${AWS::Region}
 
   OpenldapService:
     Type: AWSQS::Kubernetes::Helm
