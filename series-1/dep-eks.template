@@ -378,36 +378,36 @@ Resources:
           HIVE_DB_PASS: "${DbUserPassword}"
           HIVE_WAREHOUSE_S3LOCATION: "s3://${S3BucketName}/hive/"
 
-#  HadoopService:
-#    Type: AWSQS::Kubernetes::Helm
-#    DependsOn:
-#      - EbsCsiAddon
-#      - EksCluster
-#      - ClusterNamespace
-#      - HadoopNodeGroup
-#      - HiveMetastoreService
-#      - OpenldapService
-#    Properties:
-#      ClusterID: !Ref EksCluster
-#      Repository: https://tomxiaoyz.github.io/big-data-platform-public/
-#      Chart: dep/hadoop
-#      Namespace: hadoop
-#      Name: hadoop
-#      Version: 1.0.0
-#      ValueYaml: !Sub |
-#        ldap:
-#          url: ldap://openldap.platform.svc.cluster.local:389
-#          bind_dn: cn=${LdapAdmin},dc=${LdapDomainName},dc=com
-#          bind_password: ${LdapAdminPassword}
-#        hive:
-#          mysql:
-#            endpoint: ${DbEndpoint}
-#            database: hive
-#            port: ${DbPort}
-#            username: ${DbUserName}
-#            password: ${DbUserPassword}
-#          warehouse:
-#            location: s3://${S3BucketName}/hive/
+  HadoopService:
+    Type: AWSQS::Kubernetes::Helm
+    DependsOn:
+      - EbsCsiAddon
+      - EksCluster
+      - ClusterNamespace
+      - HadoopNodeGroup
+      - HiveMetastoreService
+      - OpenldapService
+    Properties:
+      ClusterID: !Ref EksCluster
+      Repository: https://tomxiaoyz.github.io/big-data-platform-public/
+      Chart: dep/hadoop
+      Namespace: hadoop
+      Name: hadoop
+      Version: 1.0.0
+      ValueYaml: !Sub |
+        ldap:
+          url: ldap://openldap.platform.svc.cluster.local:389
+          bind_dn: cn=${LdapAdmin},dc=${LdapDomainName},dc=com
+          bind_password: ${LdapAdminPassword}
+        hive:
+          mysql:
+            endpoint: ${DbEndpoint}
+            database: hive
+            port: ${DbPort}
+            username: ${DbUserName}
+            password: ${DbUserPassword}
+          warehouse:
+            location: s3://${S3BucketName}/hive/
 
   ZookeeperService:
     Type: AWSQS::Kubernetes::Helm
