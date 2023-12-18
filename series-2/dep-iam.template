@@ -1,0 +1,239 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Dep IAM Role
+Parameters:
+  EnvironmentName:
+    Description: An environment name that is prefixed to resource names
+    Type: String
+  S3BucketName:
+    Description: S3 bucket name to grant access to.
+    Type: String
+
+Resources:
+  DepIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: "IAM role created for managing dep resources"
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - eks.amazonaws.com
+                - resources.cloudformation.amazonaws.com
+                - cloudformation.amazonaws.com
+                - lambda.amazonaws.com
+                - apigateway.amazonaws.com
+                - events.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+      RoleName: !Join
+        - "-"
+        - - !Ref EnvironmentName
+          - "iam-role"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEKSClusterPolicy
+        - arn:aws:iam::aws:policy/AmazonEKSServicePolicy
+        - arn:aws:iam::aws:policy/SecretsManagerReadWrite
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy
+      Policies:
+        - PolicyName: DEPS3AccessPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - s3:*
+                Effect: Allow
+                Resource:
+                  - !Join
+                    - ""
+                    - - "arn:aws:s3:::"
+                      - !Ref S3BucketName
+                  - !Join
+                    - ""
+                    - - "arn:aws:s3:::"
+                      - !Ref S3BucketName
+                      - "/*"
+        - PolicyName: ResourceTypePolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "sts:GetCallerIdentity"
+                  - "eks:CreateCluster"
+                  - "eks:DeleteCluster"
+                  - "eks:DescribeCluster"
+                  - "eks:ListTagsForResource"
+                  - "eks:UpdateClusterVersion"
+                  - "eks:UpdateClusterConfig"
+                  - "eks:TagResource"
+                  - "eks:UntagResource"
+                  - "iam:PassRole"
+                  - "sts:AssumeRole"
+                  - "lambda:UpdateFunctionConfiguration"
+                  - "lambda:DeleteFunction"
+                  - "lambda:GetFunction"
+                  - "lambda:InvokeFunction"
+                  - "lambda:CreateFunction"
+                  - "lambda:UpdateFunctionCode"
+                  - "ec2:DescribeVpcs"
+                  - "ec2:DescribeSubnets"
+                  - "ec2:DescribeSecurityGroups"
+                  - "kms:CreateGrant"
+                  - "kms:DescribeKey"
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:DescribeLogGroups"
+                  - "logs:DescribeLogStreams"
+                  - "logs:PutLogEvents"
+                  - "cloudwatch:ListMetrics"
+                  - "cloudwatch:PutMetricData"
+                Resource: "*"
+        - PolicyName: EbsCsi
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - "kms:Decrypt"
+                  - "kms:GenerateDataKeyWithoutPlaintext"
+                  - "kms:CreateGrant"
+                Effect: Allow
+                Resource: "*"
+        - PolicyName: EksAutoScaling
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - "autoscaling:DescribeAutoScalingGroups"
+                  - "autoscaling:DescribeAutoScalingInstances"
+                  - "autoscaling:DescribeLaunchConfigurations"
+                  - "autoscaling:DescribeTags"
+                  - "autoscaling:SetDesiredCapacity"
+                  - "autoscaling:TerminateInstanceInAutoScalingGroup"
+                  - "ec2:DescribeLaunchTemplateVersions"
+                Effect: Allow
+                Resource: "*"
+
+  DepEksWorkerIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: "IAM role created for managing eks node groups"
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - eks.amazonaws.com
+                - resources.cloudformation.amazonaws.com
+                - cloudformation.amazonaws.com
+                - lambda.amazonaws.com
+                - apigateway.amazonaws.com
+                - events.amazonaws.com
+                - ec2.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+      RoleName: !Join
+        - "-"
+        - - !Ref EnvironmentName
+          - "worker-role"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+        - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy
+        - arn:aws:iam::aws:policy/SecretsManagerReadWrite
+      Policies:
+        - PolicyName: DEPS3AccessPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - s3:*
+                Effect: Allow
+                Resource:
+                  - !Join
+                    - ""
+                    - - "arn:aws:s3:::"
+                      - !Ref S3BucketName
+                  - !Join
+                    - ""
+                    - - "arn:aws:s3:::"
+                      - !Ref S3BucketName
+                      - "/*"
+        - PolicyName: ResourceTypePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - "eks:CreateCluster"
+                  - "eks:DeleteCluster"
+                  - "iam:PassRole"
+                  - "sts:AssumeRole"
+                  - "lambda:InvokeFunction"
+                  - "lambda:CreateFunction"
+                Effect: Allow
+                Resource: !Sub arn:aws:eks:${AWS::Region}:${AWS::AccountId}:cluster/${EnvironmentName}-eks-cluster/*
+        - PolicyName: EbsCsi
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - "kms:Decrypt"
+                  - "kms:GenerateDataKeyWithoutPlaintext"
+                  - "kms:CreateGrant"
+                Effect: Allow
+                Resource: "*"
+        - PolicyName: AutoScaler
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - "autoscaling:DescribeAutoScalingGroups"
+                  - "autoscaling:DescribeAutoScalingInstances"
+                  - "autoscaling:DescribeLaunchConfigurations"
+                  - "autoscaling:DescribeTags"
+                  - "autoscaling:SetDesiredCapacity"
+                  - "autoscaling:TerminateInstanceInAutoScalingGroup"
+                  - "eks:DescribeNodegroup"
+                Effect: Allow
+                Resource: "*"
+
+  DepLambdaIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: "IAM role created for lambda execution"
+      RoleName: !Join
+        - "-"
+        - - !Ref EnvironmentName
+          - "lambda-role"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - eks.amazonaws.com
+                - lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Path: "/"
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/AmazonEKSClusterPolicy'
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/AmazonEKSServicePolicy'
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaENIManagementAccess
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+Outputs:
+  DepIamRole:
+    Description: IAM role created for managing dep resources
+    Value: !GetAtt DepIamRole.Arn
+  DepEksWorkerIamRole:
+    Description: IAM role created for managing eks node groups
+    Value: !GetAtt DepEksWorkerIamRole.Arn
+  DepLambdaIamRole:
+    Description: IAM role created for lambda execution
+    Value: !GetAtt DepLambdaIamRole.Arn

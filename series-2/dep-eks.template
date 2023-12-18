@@ -483,6 +483,240 @@ Resources:
           url: "ldap://openldap.platform.svc.cluster.local:389"
           domain_name: "${LdapDomainName}"
 
+  ApolloPortal:
+    Type: AWSQS::Kubernetes::Helm
+    DependsOn:
+      - EbsCsiAddon
+      - EksCluster
+      - ClusterNamespace
+      - PlatformNodeGroup
+    Properties:
+      ClusterID: !Ref EksCluster
+      Repository: https://tomxiaoyz.github.io/big-data-platform-public/
+      Chart: dep/apollo-portal
+      Namespace: platform
+      Name: apollo-portal
+      Version: 1.0.0
+      ValueYaml: !Sub |
+        config:
+          envs: dev,prod
+          metaServers:
+            dev: http://apollo-service-dev-apollo-configservice:8080
+            prod: http://apollo-service-prod-apollo-configservice:8080
+        portaldb:
+          host: ${DbEndpoint}
+          port: ${DbPort}
+          dbName: apollo_portal
+          userName: ${DbUserName}
+          password: ${DbUserPassword}
+          connectionStringProperties: characterEncoding=utf8&useSSL=false
+          service:
+            enabled: true
+            type: ExternalName
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+                - matchExpressions:
+                    - key: nodegroup
+                      operator: In
+                      values:
+                        - platform          
+
+  ApolloService:
+    Type: AWSQS::Kubernetes::Helm
+    DependsOn:
+      - EbsCsiAddon
+      - EksCluster
+      - ClusterNamespace
+      - PlatformNodeGroup
+    Properties:
+      ClusterID: !Ref EksCluster
+      Repository: https://tomxiaoyz.github.io/big-data-platform-public/
+      Chart: dep/apollo-service
+      Namespace: platform
+      Name: apollo-service
+      Version: 1.0.0
+      ValueYaml: !Sub |
+        configdb:
+          host: ${DbEndpoint}
+          port: ${DbPort}
+          dbName: apollo_config
+          userName: ${DbUserName}
+          password: ${DbUserPassword}
+          service:
+            enabled: true
+            type: ExternalName
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+                - matchExpressions:
+                    - key: nodegroup
+                      operator: In
+                      values:
+                        - platform
+
+  NacosService:
+    Type: AWSQS::Kubernetes::Helm
+    DependsOn:
+      - EbsCsiAddon
+      - EksCluster
+      - ClusterNamespace
+      - PlatformNodeGroup
+    Properties:
+      ClusterID: !Ref EksCluster
+      Repository: https://tomxiaoyz.github.io/big-data-platform-public/
+      Chart: dep/nacos
+      Namespace: platform
+      Name: nacos
+      Version: 1.0.0
+      ValueYaml: !Sub |
+        namespace: platform
+        nacos:
+          storage:
+            type: mysql
+            db:
+              host: ${DbEndpoint}
+              name: nacos
+              port: ${DbPort}
+              username: ${DbUserName}
+              password: ${DbUserPassword}
+              param: characterEncoding=utf8&connectTimeout=1000&socketTimeout=3000&autoReconnect=true&useSSL=false&serverTimezone=UTC
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+                - matchExpressions:
+                    - key: nodegroup
+                      operator: In
+                      values:
+                        - platform    
+
+#  RedisService:
+#    Type: AWSQS::Kubernetes::Helm
+#    DependsOn:
+#      - EbsCsiAddon
+#      - EksCluster
+#      - ClusterNamespace
+#      - PlatformNodeGroup
+#    Properties:
+#      ClusterID: !Ref EksCluster
+#      Repository: https://charts.bitnami.com/bitnami
+#      Chart: redis
+#      Namespace: platform
+#      Name: redis
+#      ValueYaml: !Sub |
+#        global:
+#          redis:
+#            password: ${RedisPassword}
+#        master:
+#          affinity:
+#            nodeAffinity:
+#              requiredDuringSchedulingIgnoredDuringExecution:
+#                nodeSelectorTerms:
+#                  - matchExpressions:
+#                      - key: nodegroup
+#                        operator: In
+#                        values:
+#                          - platform
+#        replica:
+#          affinity:
+#            nodeAffinity:
+#              requiredDuringSchedulingIgnoredDuringExecution:
+#                nodeSelectorTerms:
+#                  - matchExpressions:
+#                      - key: nodegroup
+#                        operator: In
+#                        values:
+#                          - platform
+
+  PrometheusPushGatewayService:
+    Type: AWSQS::Kubernetes::Helm
+    DependsOn:
+      - EbsCsiAddon
+      - EksCluster
+      - ClusterNamespace
+      - PlatformNodeGroup
+    Properties:
+      ClusterID: !Ref EksCluster
+      Repository: https://tomxiaoyz.github.io/big-data-platform-public/
+      Chart: dep/prometheus-pushgateway
+      Namespace: platform
+      Name: prometheus-pushgateway
+      Version: 1.0.0
+      ValueYaml: |
+        persistentVolume:
+          storageClass: ebs-sc
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+                - matchExpressions:
+                    - key: nodegroup
+                      operator: In
+                      values:
+                        - platform
+
+#  DepGatewayService:
+#    Type: AWSQS::Kubernetes::Helm
+#    DependsOn:
+#      - EbsCsiAddon
+#      - EksCluster
+#      - ClusterNamespace
+#      - PlatformNodeGroup
+#    Properties:
+#      ClusterID: !Ref EksCluster
+#      Repository: https://tomxiaoyz.github.io/big-data-platform-public/
+#      Chart: dep/gateway
+#      Namespace: platform
+#      Name: dep-gateway
+#      Version: 1.0.0
+#      ValueYaml: !Sub |
+#        fullnameOverride: dep-gateway
+#        spring:
+#          profiles:
+#            active: prod
+#          application:
+#            name: dep-gateway
+#          cloud:
+#            nacos:
+#              discovery:
+#                server_addr: nacos-cs.platform.svc.cluster.local
+#          datasource:
+#            url: jdbc:mysql://${DbEndpoint}:3306/scheduler
+#            username: ${DbUserName}
+#            password: ${DbUserPassword}
+#          redis:
+#            database: 0
+#            host: redis-master.platform.svc.cluster.local
+#            port: 6379
+#            password: ${RedisPassword}
+#        management:
+#          metrics:
+#            export:
+#              prometheus:
+#                pushgateway:
+#                  baseUrl: http://prometheus-pushgateway.platform.svc.cluster.local:9091
+#        app:
+#          id: dep-gateway
+#        apollo:
+#          meta: http://apollo-service-apollo-configservice.platform.svc.cluster.local:8080
+#          bootstrap:
+#            enabled: true
+#            eagerLoad:
+#              enabled: true
+#        affinity:
+#          nodeAffinity:
+#            requiredDuringSchedulingIgnoredDuringExecution:
+#              nodeSelectorTerms:
+#                - matchExpressions:
+#                    - key: nodegroup
+#                      operator: In
+#                      values:
+#                        - platform
+
+
 Outputs:
   Arn:
     Description: The ARN of the cluster, such as arn:aws:eks:us-west-2:666666666666:cluster/prod.
