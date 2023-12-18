@@ -47,6 +47,11 @@ Metadata:
         - LdapAdmin
         - LdapAdminPassword
 
+    - Label:
+        default: Redis Configuration
+      Parameters:
+        - RedisPassword
+
     ParameterLabels:
       # DEP Basic Configuration
       EnvironmentName:
@@ -99,6 +104,10 @@ Metadata:
         default: Ldap admin username.
       LdapAdminPassword:
         default: Ldap admin password.
+
+      # Redis Configuration
+      RedisPassword:
+        default: Redis root password.
 
 Parameters:
   # DEP Basic Configuration
@@ -247,6 +256,11 @@ Parameters:
     Type: String
     Default: 'dep123456'
 
+  RedisPassword:
+    Description: Redis root password.
+    Type: String
+    Default: 'depredis123456'
+
 Conditions:
   CustomS3BucketName: !Not [!Equals ['', !Ref S3BucketName]]
 
@@ -362,7 +376,7 @@ Resources:
         LdapDomainName: !Ref LdapDomainName
         LdapAdmin: !Ref LdapAdmin
         LdapAdminPassword: !Ref LdapAdminPassword
-
+        RedisPassword: !Ref RedisPassword
 
 # Use lambda function to initialize database
   LambdaLayer:
