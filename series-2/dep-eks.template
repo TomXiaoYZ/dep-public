@@ -593,43 +593,44 @@ Resources:
                       values:
                         - platform    
 
-#  RedisService:
-#    Type: AWSQS::Kubernetes::Helm
-#    DependsOn:
-#      - EbsCsiAddon
-#      - EksCluster
-#      - ClusterNamespace
-#      - PlatformNodeGroup
-#    Properties:
-#      ClusterID: !Ref EksCluster
-#      Repository: https://charts.bitnami.com/bitnami
-#      Chart: redis
-#      Namespace: platform
-#      Name: redis
-#      ValueYaml: !Sub |
-#        global:
-#          redis:
-#            password: ${RedisPassword}
-#        master:
-#          affinity:
-#            nodeAffinity:
-#              requiredDuringSchedulingIgnoredDuringExecution:
-#                nodeSelectorTerms:
-#                  - matchExpressions:
-#                      - key: nodegroup
-#                        operator: In
-#                        values:
-#                          - platform
-#        replica:
-#          affinity:
-#            nodeAffinity:
-#              requiredDuringSchedulingIgnoredDuringExecution:
-#                nodeSelectorTerms:
-#                  - matchExpressions:
-#                      - key: nodegroup
-#                        operator: In
-#                        values:
-#                          - platform
+  RedisService:
+    Type: AWSQS::Kubernetes::Helm
+    DependsOn:
+      - EbsCsiAddon
+      - EksCluster
+      - ClusterNamespace
+      - PlatformNodeGroup
+    Properties:
+      ClusterID: !Ref EksCluster
+      Repository: https://tomxiaoyz.github.io/big-data-platform-public/
+      Chart: redis
+      Namespace: platform
+      Name: redis
+      Version: 1.0.0
+      ValueYaml: !Sub |
+        global:
+          redis:
+            password: ${RedisPassword}
+        master:
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: nodegroup
+                        operator: In
+                        values:
+                          - platform
+        replica:
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: nodegroup
+                        operator: In
+                        values:
+                          - platform
 
   PrometheusPushGatewayService:
     Type: AWSQS::Kubernetes::Helm
