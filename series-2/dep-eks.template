@@ -67,10 +67,22 @@ Parameters:
   LdapAdminPassword:
     Description: Ldap admin password.
     Type: String
+  LdapUser:
+    Description: Ldap user to grant admin access to.
+    Type: String
+    Default: 'depadmin'
+  LdapUserPassword:
+    Description: Password for Ldap user to grant admin access to.
+    Type: String
+    Default: 'dep123456'
 
   # Redis Configuration
   RedisPassword:
     Description: Redis password.
+    Type: String
+
+  CliUsername:
+    Description: The aws username to grant eks cli access to.
     Type: String
 
 Resources:
@@ -109,7 +121,7 @@ Resources:
             Username: "Worker"
             Groups: [ "system:masters", "kube-system:aws-auth", "system:nodes" ]
           ## Temporary use
-          - Arn: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:user/tomxiao"
+          - Arn: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:user/${CliUsername}"
             Username: "CliUser"
             Groups: [ "system:masters", "kube-system:aws-auth" ]
       Tags:
@@ -150,8 +162,6 @@ Resources:
       NodeRole: !Ref WorkerRoleArn
       RemoteAccess:
         Ec2SshKey: !Ref Ec2SshKey
-#        SourceSecurityGroups:
-#          - !Ref SecurityGroupIds
       ScalingConfig:
         DesiredSize: 1
         MaxSize: 5
@@ -185,8 +195,6 @@ Resources:
       NodeRole: !Ref WorkerRoleArn
       RemoteAccess:
         Ec2SshKey: !Ref Ec2SshKey
-#        SourceSecurityGroups:
-#          - !Ref SecurityGroupIds
       ScalingConfig:
         DesiredSize: 2
         MaxSize: 5
@@ -220,8 +228,6 @@ Resources:
       NodeRole: !Ref WorkerRoleArn
       RemoteAccess:
         Ec2SshKey: !Ref Ec2SshKey
-#        SourceSecurityGroups:
-#          - !Ref SecurityGroupIds
       ScalingConfig:
         DesiredSize: 1
         MaxSize: 5
@@ -306,12 +312,42 @@ Resources:
       Version: 1.0.0
       ValueYaml: !Sub |
         global:
-          ldapDomain: dc=${LdapDomainName},dc=com
-          adminUser: ${LdapAdmin}
-          adminPassword: ${LdapAdminPassword}
-          configUserEnabled: true
-          configUser: ${LdapAdmin}
-          configPassword: ${LdapAdminPassword}
+          ldapDomain: "dc=${LdapDomainName},dc=com"
+          adminUser: "${LdapAdmin}"
+          adminPassword: "${LdapAdminPassword}"
+          configUserEnabled: false
+          username: "${LdapUser}"
+          userPassword: "${LdapUserPassword}"
+        customLdifFiles:
+          00-root.ldif: |-
+            # Root creation
+            dn: dc=${LdapDomainName},dc=com
+            objectClass: dcObject
+            objectClass: organization
+            o: ${LdapDomainName}
+            dc: ${LdapDomainName}
+          01-users-group.ldif: |-
+            dn: ou=People,dc=${LdapDomainName},dc=com
+            ou: People
+            objectClass: organizationalUnit
+            objectClass: top
+        customAcls: |-
+          dn: olcDatabase={2}mdb,cn=config
+          changetype: modify
+          replace: olcAccess
+          olcAccess: {0}to *
+            by dn.exact=gidNumber=0+uidNumber=1001,cn=peercred,cn=external,cn=auth manage
+            by * break
+          olcAccess: {1}to attrs=userPassword,shadowLastChange
+            by self write
+            by dn="cn=${LdapAdmin},dc=${LdapDomainName},dc=com" write
+            by set="user/employeeType & [ldap_admin]" write
+            by anonymous auth by * none
+          olcAccess: {2}to *
+            by dn="cn=${LdapAdmin},dc=${LdapDomainName},dc=com" write
+            by set="user/employeeType & [ldap_admin]" write
+            by self read
+            by * none
         persistence:
           storageClass: ebs-sc
         affinity:
@@ -362,7 +398,7 @@ Resources:
             SYNC_LDAP_BIND_PASSWORD: ${LdapAdminPassword}
             SYNC_LDAP_SEARCH_BASE: dc=${LdapDomainName},dc=com
             SYNC_LDAP_USER_SEARCH_BASE: ou=People,dc=${LdapDomainName},dc=com
-            SYNC_LDAP_USER_NAME_ATTRIBUTE: uid
+            SYNC_LDAP_USER_NAME_ATTRIBUTE: cn
 
   HiveMetastoreService:
     Type: AWSQS::Kubernetes::Helm
@@ -619,7 +655,7 @@ Resources:
                     - key: nodegroup
                       operator: In
                       values:
-                        - platform    
+                        - platform
 
   RedisService:
     Type: AWSQS::Kubernetes::Helm
@@ -687,68 +723,68 @@ Resources:
                       values:
                         - platform
 
-  DepGatewayService:
-    Type: AWSQS::Kubernetes::Helm
-    DependsOn:
-      - EbsCsiAddon
-      - EksCluster
-      - ClusterNamespace
-      - PlatformNodeGroup
-      - ApolloPortal
-      - ApolloProdService
-      - NacosService
-      - RedisService
-      - PrometheusPushGatewayService
-    Properties:
-      ClusterID: !Ref EksCluster
-      Repository: https://tomxiaoyz.github.io/big-data-platform-public/
-      Chart: dep/gateway
-      Namespace: platform
-      Name: dep-gateway
-      Version: 1.0.0
-      ValueYaml: !Sub |
-        fullnameOverride: dep-gateway
-        spring:
-          profiles:
-            active: prod
-          application:
-            name: dep-gateway
-          cloud:
-            nacos:
-              discovery:
-                server_addr: nacos-cs.platform.svc.cluster.local
-          datasource:
-            url: jdbc:mysql://${DbEndpoint}:3306/scheduler
-            username: ${DbUserName}
-            password: ${DbUserPassword}
-          redis:
-            database: 0
-            host: redis-master.platform.svc.cluster.local
-            port: 6379
-            password: ${RedisPassword}
-        management:
-          metrics:
-            export:
-              prometheus:
-                pushgateway:
-                  baseUrl: http://prometheus-pushgateway.platform.svc.cluster.local:9091
-        app:
-          id: dep-gateway
-        apollo:
-          meta: http://apollo-service-prod-apollo-configservice.platform.svc.cluster.local:8080
-          bootstrap:
-            enabled: true
-            eagerLoad:
-              enabled: true
-        affinity:
-          nodeAffinity:
-            requiredDuringSchedulingIgnoredDuringExecution:
-              nodeSelectorTerms:
-                - matchExpressions:
-                    - key: nodegroup
-                      operator: In
-                      values:
-                        - platform
+#  DepGatewayService:
+#    Type: AWSQS::Kubernetes::Helm
+#    DependsOn:
+#      - EbsCsiAddon
+#      - EksCluster
+#      - ClusterNamespace
+#      - PlatformNodeGroup
+#      - ApolloPortal
+#      - ApolloProdService
+#      - NacosService
+#      - RedisService
+#      - PrometheusPushGatewayService
+#    Properties:
+#      ClusterID: !Ref EksCluster
+#      Repository: https://tomxiaoyz.github.io/big-data-platform-public/
+#      Chart: dep/gateway
+#      Namespace: platform
+#      Name: dep-gateway
+#      Version: 1.0.0
+#      ValueYaml: !Sub |
+#        fullnameOverride: dep-gateway
+#        spring:
+#          profiles:
+#            active: prod
+#          application:
+#            name: dep-gateway
+#          cloud:
+#            nacos:
+#              discovery:
+#                server_addr: nacos-cs.platform.svc.cluster.local
+#          datasource:
+#            url: jdbc:mysql://${DbEndpoint}:3306/scheduler
+#            username: ${DbUserName}
+#            password: ${DbUserPassword}
+#          redis:
+#            database: 0
+#            host: redis-master.platform.svc.cluster.local
+#            port: 6379
+#            password: ${RedisPassword}
+#        management:
+#          metrics:
+#            export:
+#              prometheus:
+#                pushgateway:
+#                  baseUrl: http://prometheus-pushgateway.platform.svc.cluster.local:9091
+#        app:
+#          id: dep-gateway
+#        apollo:
+#          meta: http://apollo-service-prod-apollo-configservice.platform.svc.cluster.local:8080
+#          bootstrap:
+#            enabled: true
+#            eagerLoad:
+#              enabled: true
+#        affinity:
+#          nodeAffinity:
+#            requiredDuringSchedulingIgnoredDuringExecution:
+#              nodeSelectorTerms:
+#                - matchExpressions:
+#                    - key: nodegroup
+#                      operator: In
+#                      values:
+#                        - platform
 
   DepAuthService:
     Type: AWSQS::Kubernetes::Helm
@@ -910,6 +946,21 @@ Resources:
           datadownload:
             whitelist:
               roleid: 1,24
+
+  DepWebService:
+    Type: AWSQS::Kubernetes::Helm
+    DependsOn:
+      - EbsCsiAddon
+      - EksCluster
+      - ClusterNamespace
+      - PlatformNodeGroup
+    Properties:
+      ClusterID: !Ref EksCluster
+      Repository: https://tomxiaoyz.github.io/big-data-platform-public/
+      Chart: dep/web
+      Namespace: platform
+      Name: dep-web
+      Version: 1.0.0
 
 Outputs:
   Arn:

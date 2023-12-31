@@ -10,6 +10,7 @@ Metadata:
         default: DEP Basic Configuration
       Parameters:
         - EnvironmentName
+        - CliUsername
 
     - Label:
         default: VPC Network Configuration
@@ -46,6 +47,8 @@ Metadata:
         - LdapDomainName
         - LdapAdmin
         - LdapAdminPassword
+        - LdapUser
+        - LdapUserPassword
 
     - Label:
         default: Redis Configuration
@@ -56,6 +59,9 @@ Metadata:
       # DEP Basic Configuration
       EnvironmentName:
         default: Set your Dep application name.
+      # Cli username
+      CliUsername:
+        default: The aws username to grant eks cli access to.
 
       # VPC Network Configuration
       VpcCIDR:
@@ -104,6 +110,10 @@ Metadata:
         default: Ldap admin username.
       LdapAdminPassword:
         default: Ldap admin password.
+      LdapUser:
+        default: Ldap user to grant admin access to.
+      LdapUserPassword:
+        default: Password for Ldap user to grant admin access to.
 
       # Redis Configuration
       RedisPassword:
@@ -114,6 +124,10 @@ Parameters:
   EnvironmentName:
     Description: Set your dep application name.
     Default: dep
+    Type: String
+
+  CliUsername:
+    Description: The aws username to grant eks cli access to.
     Type: String
 
   # VPC Network Configuration
@@ -250,9 +264,17 @@ Parameters:
   LdapAdmin:
     Description: Ldap admin username.
     Type: String
-    Default: 'depadmin'
+    Default: 'admin'
   LdapAdminPassword:
     Description: Ldap admin password.
+    Type: String
+    Default: 'admin123456'
+  LdapUser:
+    Description: Ldap user to grant admin access to.
+    Type: String
+    Default: 'depadmin'
+  LdapUserPassword:
+    Description: Password for Ldap user to grant admin access to.
     Type: String
     Default: 'dep123456'
 
@@ -376,7 +398,10 @@ Resources:
         LdapDomainName: !Ref LdapDomainName
         LdapAdmin: !Ref LdapAdmin
         LdapAdminPassword: !Ref LdapAdminPassword
+        LdapUser: !Ref LdapUser
+        LdapUserPassword: !Ref LdapUserPassword
         RedisPassword: !Ref RedisPassword
+        CliUsername: !Ref CliUsername
 
 # Use lambda function to initialize database
   LambdaLayer:
