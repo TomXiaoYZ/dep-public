@@ -85,6 +85,10 @@ Parameters:
     Description: The aws username to grant eks cli access to.
     Type: String
 
+  RangerPassword:
+    Description: Admin password for ranger.
+    Type: String
+
 Resources:
   EksCluster:
     Type: AWSQS::EKS::Cluster
@@ -390,6 +394,9 @@ Resources:
             XA_LDAP_BASE_DN: dc=${LdapDomainName},dc=com
             XA_LDAP_BIND_DN: cn=${LdapAdmin},dc=${LdapDomainName},dc=com
             XA_LDAP_BIND_PASSWORD: ${LdapAdminPassword}
+            LDAP_USER: ${LdapUser}
+            LDAP_PASSWORD: ${LdapUserPassword}
+            RANGER_PASSWORD: ${RangerPassword}
           usersync:
             POLICY_MGR_URL: http://ranger-admin.platform.svc.cluster.local:6080
             SYNC_SOURCE: ldap
@@ -442,6 +449,7 @@ Resources:
           url: ldap://openldap.platform.svc.cluster.local:389
           bind_dn: cn=${LdapAdmin},dc=${LdapDomainName},dc=com
           bind_password: ${LdapAdminPassword}
+          base_dn: ou=People,dc=${LdapDomainName},dc=com
         hive:
           mysql:
             endpoint: ${DbEndpoint}

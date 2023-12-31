@@ -55,6 +55,11 @@ Metadata:
       Parameters:
         - RedisPassword
 
+    - Label:
+        default: Others
+      Parameters:
+        - RangerPassword
+
     ParameterLabels:
       # DEP Basic Configuration
       EnvironmentName:
@@ -118,6 +123,9 @@ Metadata:
       # Redis Configuration
       RedisPassword:
         default: Redis root password.
+
+      RangerPassword:
+        default: Admin password for ranger.
 
 Parameters:
   # DEP Basic Configuration
@@ -283,6 +291,11 @@ Parameters:
     Type: String
     Default: 'depredis123456'
 
+  RangerPassword:
+    Description: Admin password for ranger.
+    Type: String
+    Default: 'dqw988ca012n4'
+
 Conditions:
   CustomS3BucketName: !Not [!Equals ['', !Ref S3BucketName]]
 
@@ -402,6 +415,7 @@ Resources:
         LdapUserPassword: !Ref LdapUserPassword
         RedisPassword: !Ref RedisPassword
         CliUsername: !Ref CliUsername
+        RangerPassword: !Ref RangerPassword
 
 # Use lambda function to initialize database
   LambdaLayer:
