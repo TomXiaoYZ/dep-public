@@ -294,7 +294,7 @@ Parameters:
   RangerPassword:
     Description: Admin password for ranger.
     Type: String
-    Default: 'dqw988ca012n4'
+    Default: 'dqwW988Ca012n4!'
 
 Conditions:
   CustomS3BucketName: !Not [!Equals ['', !Ref S3BucketName]]
