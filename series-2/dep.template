@@ -466,6 +466,10 @@ Resources:
 
   LambdaInvokerStack:
     Type: AWS::Serverless::Function
+    DependsOn:
+      - DepIamStack
+      - DepDBInstanceStack
+      - LambdaLayer
     Properties:
       Handler: index.handler
       Runtime: nodejs16.x
@@ -479,6 +483,10 @@ Resources:
 
   CustomInvoker:
     Type: AWS::CloudFormation::CustomResource
+    DependsOn:
+      - DepIamStack
+      - DepDBInstanceStack
+      - LambdaLayer
     Version: "1.0"
     Properties:
       ServiceToken: !GetAtt LambdaInvokerStack.Arn
