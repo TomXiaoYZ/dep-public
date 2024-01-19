@@ -463,6 +463,7 @@ Resources:
           RDS_ENDPOINT: !GetAtt DepDBInstanceStack.Outputs.RDSEndPointAddress
           USERNAME: !Ref DBMasterUsername
           PASSWORD: !Ref DBMasterUserPassword
+          ADMIN_USERNAME: !Ref LdapUser
 
   LambdaInvokerStack:
     Type: AWS::Serverless::Function
