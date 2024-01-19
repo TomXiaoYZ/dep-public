@@ -167,9 +167,9 @@ Resources:
       RemoteAccess:
         Ec2SshKey: !Ref Ec2SshKey
       ScalingConfig:
-        DesiredSize: 1
+        DesiredSize: 2
         MaxSize: 5
-        MinSize: 1
+        MinSize: 2
       Subnets:
         - !Ref PublicSubnet1Id
         - !Ref PublicSubnet2Id
@@ -233,9 +233,9 @@ Resources:
       RemoteAccess:
         Ec2SshKey: !Ref Ec2SshKey
       ScalingConfig:
-        DesiredSize: 1
+        DesiredSize: 2
         MaxSize: 5
-        MinSize: 1
+        MinSize: 2
       Subnets:
         - !Ref PublicSubnet1Id
         - !Ref PublicSubnet2Id
@@ -504,6 +504,8 @@ Resources:
       Name: trino
       Version: 1.0.0
       ValueYaml: !Sub |
+        server:
+          workers: 4
         additionalCatalogs:
           hive: |-
             hive.metastore-refresh-interval=1m
