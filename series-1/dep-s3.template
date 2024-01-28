@@ -7,19 +7,19 @@ Parameters:
 Resources:
   DepS3:
     Type: 'AWS::S3::Bucket'
-    DeletionPolicy: Retain
+    #    DeletionPolicy: Retain
     Properties:
       BucketName: !Ref BucketName
       LifecycleConfiguration:
         Rules:
-            - Id: IntelligentTieringTransition
-              Status: Enabled
-              Transitions:
-                - TransitionInDays: 7
-                  StorageClass: INTELLIGENT_TIERING
-            - Id: NoncurrentVersionExpirationInDays
-              Status: Enabled
-              NoncurrentVersionExpirationInDays: 1
+          - Id: IntelligentTieringTransition
+            Status: Enabled
+            Transitions:
+              - TransitionInDays: 7
+                StorageClass: INTELLIGENT_TIERING
+          - Id: NoncurrentVersionExpirationInDays
+            Status: Enabled
+            NoncurrentVersionExpirationInDays: 1
 Outputs:
   BucketName:
     Description: S3 Bucket Name

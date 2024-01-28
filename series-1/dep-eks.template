@@ -56,6 +56,7 @@ Parameters:
     Type: String
   S3BucketName:
     Type: String
+
   # LDAP Configuration
   LdapDomainName:
     Description: Ldap domain name.
@@ -65,6 +66,27 @@ Parameters:
     Type: String
   LdapAdminPassword:
     Description: Ldap admin password.
+    Type: String
+  LdapUser:
+    Description: Ldap user to grant admin access to.
+    Type: String
+    Default: 'depadmin'
+  LdapUserPassword:
+    Description: Password for Ldap user to grant admin access to.
+    Type: String
+    Default: 'dep123456'
+
+  # Redis Configuration
+  RedisPassword:
+    Description: Redis password.
+    Type: String
+
+  CliUsername:
+    Description: The aws username to grant eks cli access to.
+    Type: String
+
+  RangerPassword:
+    Description: Admin password for ranger.
     Type: String
 
 Resources:
@@ -103,7 +125,7 @@ Resources:
             Username: "Worker"
             Groups: [ "system:masters", "kube-system:aws-auth", "system:nodes" ]
           ## Temporary use
-          - Arn: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:user/tomxiao"
+          - Arn: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:user/${CliUsername}"
             Username: "CliUser"
             Groups: [ "system:masters", "kube-system:aws-auth" ]
       Tags:
@@ -144,12 +166,10 @@ Resources:
       NodeRole: !Ref WorkerRoleArn
       RemoteAccess:
         Ec2SshKey: !Ref Ec2SshKey
-#        SourceSecurityGroups:
-#          - !Ref SecurityGroupIds
       ScalingConfig:
-        DesiredSize: 1
+        DesiredSize: 2
         MaxSize: 5
-        MinSize: 1
+        MinSize: 2
       Subnets:
         - !Ref PublicSubnet1Id
         - !Ref PublicSubnet2Id
@@ -179,8 +199,6 @@ Resources:
       NodeRole: !Ref WorkerRoleArn
       RemoteAccess:
         Ec2SshKey: !Ref Ec2SshKey
-#        SourceSecurityGroups:
-#          - !Ref SecurityGroupIds
       ScalingConfig:
         DesiredSize: 2
         MaxSize: 5
@@ -214,12 +232,10 @@ Resources:
       NodeRole: !Ref WorkerRoleArn
       RemoteAccess:
         Ec2SshKey: !Ref Ec2SshKey
-#        SourceSecurityGroups:
-#          - !Ref SecurityGroupIds
       ScalingConfig:
-        DesiredSize: 1
+        DesiredSize: 2
         MaxSize: 5
-        MinSize: 1
+        MinSize: 2
       Subnets:
         - !Ref PublicSubnet1Id
         - !Ref PublicSubnet2Id
@@ -300,12 +316,42 @@ Resources:
       Version: 1.0.0
       ValueYaml: !Sub |
         global:
-          ldapDomain: dc=${LdapDomainName},dc=com
-          adminUser: ${LdapAdmin}
-          adminPassword: ${LdapAdminPassword}
-          configUserEnabled: true
-          configUser: ${LdapAdmin}
-          configPassword: ${LdapAdminPassword}
+          ldapDomain: "dc=${LdapDomainName},dc=com"
+          adminUser: "${LdapAdmin}"
+          adminPassword: "${LdapAdminPassword}"
+          configUserEnabled: false
+          username: "${LdapUser}"
+          userPassword: "${LdapUserPassword}"
+        customLdifFiles:
+          00-root.ldif: |-
+            # Root creation
+            dn: dc=${LdapDomainName},dc=com
+            objectClass: dcObject
+            objectClass: organization
+            o: ${LdapDomainName}
+            dc: ${LdapDomainName}
+          01-users-group.ldif: |-
+            dn: ou=People,dc=${LdapDomainName},dc=com
+            ou: People
+            objectClass: organizationalUnit
+            objectClass: top
+        customAcls: |-
+          dn: olcDatabase={2}mdb,cn=config
+          changetype: modify
+          replace: olcAccess
+          olcAccess: {0}to *
+            by dn.exact=gidNumber=0+uidNumber=1001,cn=peercred,cn=external,cn=auth manage
+            by * break
+          olcAccess: {1}to attrs=userPassword,shadowLastChange
+            by self write
+            by dn="cn=${LdapAdmin},dc=${LdapDomainName},dc=com" write
+            by set="user/employeeType & [ldap_admin]" write
+            by anonymous auth by * none
+          olcAccess: {2}to *
+            by dn="cn=${LdapAdmin},dc=${LdapDomainName},dc=com" write
+            by set="user/employeeType & [ldap_admin]" write
+            by self read
+            by * none
         persistence:
           storageClass: ebs-sc
         affinity:
@@ -348,15 +394,18 @@ Resources:
             XA_LDAP_BASE_DN: dc=${LdapDomainName},dc=com
             XA_LDAP_BIND_DN: cn=${LdapAdmin},dc=${LdapDomainName},dc=com
             XA_LDAP_BIND_PASSWORD: ${LdapAdminPassword}
+            LDAP_USER: ${LdapUser}
+            LDAP_PASSWORD: ${LdapUserPassword}
+            RANGER_PASSWORD: ${RangerPassword}
           usersync:
             POLICY_MGR_URL: http://ranger-admin.platform.svc.cluster.local:6080
             SYNC_SOURCE: ldap
-            SYNC_LDAP_URL: http://openldap.platform.svc.cluster.local:389
+            SYNC_LDAP_URL: ldap://openldap.platform.svc.cluster.local:389
             SYNC_LDAP_BIND_DN: cn=${LdapAdmin},dc=${LdapDomainName},dc=com
             SYNC_LDAP_BIND_PASSWORD: ${LdapAdminPassword}
             SYNC_LDAP_SEARCH_BASE: dc=${LdapDomainName},dc=com
             SYNC_LDAP_USER_SEARCH_BASE: ou=People,dc=${LdapDomainName},dc=com
-            SYNC_LDAP_USER_NAME_ATTRIBUTE: uid
+            SYNC_LDAP_USER_NAME_ATTRIBUTE: cn
 
   HiveMetastoreService:
     Type: AWSQS::Kubernetes::Helm
@@ -400,6 +449,7 @@ Resources:
           url: ldap://openldap.platform.svc.cluster.local:389
           bind_dn: cn=${LdapAdmin},dc=${LdapDomainName},dc=com
           bind_password: ${LdapAdminPassword}
+          base_dn: ou=People,dc=${LdapDomainName},dc=com
         hive:
           mysql:
             endpoint: ${DbEndpoint}
@@ -409,6 +459,7 @@ Resources:
             password: ${DbUserPassword}
           warehouse:
             location: s3://${S3BucketName}/hive/
+        domain_database: ${LdapDomainName}
 
   ZookeeperService:
     Type: AWSQS::Kubernetes::Helm
@@ -419,10 +470,11 @@ Resources:
       - HadoopNodeGroup
     Properties:
       ClusterID: !Ref EksCluster
-      Repository: https://charts.bitnami.com/bitnami
-      Chart: bitnami/zookeeper
+      Repository: https://tomxiaoyz.github.io/big-data-platform-public/
+      Chart: zookeeper
       Namespace: hadoop
       Name: zookeeper
+      Version: 1.0.0
       ValueYaml: |
         persistence:
           storageClass: ebs-sc
@@ -452,6 +504,10 @@ Resources:
       Name: trino
       Version: 1.0.0
       ValueYaml: !Sub |
+        server:
+          workers: 4
+          exchangeManager:
+            baseDir: s3://${S3BucketName}/trino/
         additionalCatalogs:
           hive: |-
             hive.metastore-refresh-interval=1m
@@ -467,9 +523,6 @@ Resources:
             hive.max-partitions-per-writers=3000
             parquet.ignore-statistics=true
             hive.allow-rename-table=true
-        server:
-          config:
-            authenticationType: "LDAP"
         additionalConfigProperties:
           - retry-policy=TASK
           - query.remote-task.max-error-duration=10m
@@ -478,10 +531,56 @@ Resources:
           - retry-max-delay=1m
           - retry-delay-scale-factor=2.0
           - fault-tolerant-execution-task-descriptor-storage-max-memory=10GB
-          - internal-communication.shared-secret=${AWS::StackId}
-        ldap:
-          url: "ldap://openldap.platform.svc.cluster.local:389"
-          domain_name: "${LdapDomainName}"
+        additionalExchangeManagerProperties:
+          - exchange.s3.region=${AWS::Region}
+        domain_database: ${LdapDomainName}
+        domain_username: ${LdapUser}
+
+  #        server:
+  #          config:
+  #            authenticationType: "LDAP"
+  #        additionalConfigProperties:
+  #          - internal-communication.https.required=true
+  #          - internal-communication.shared-secret=${AWS::StackId}
+  #        ldap:
+  #          url: "ldap://openldap.platform.svc.cluster.local:389"
+  #          domain_name: "${LdapDomainName}"
+
+
+  ApolloProdService:
+    Type: AWSQS::Kubernetes::Helm
+    DependsOn:
+      - EbsCsiAddon
+      - EksCluster
+      - ClusterNamespace
+      - PlatformNodeGroup
+    Properties:
+      ClusterID: !Ref EksCluster
+      Repository: https://tomxiaoyz.github.io/big-data-platform-public/
+      Chart: dep/apollo-service
+      Namespace: platform
+      Name: apollo-service
+      Version: 1.0.0
+      ValueYaml: !Sub |
+        configdb:
+          host: ${DbEndpoint}
+          port: ${DbPort}
+          dbName: apollo_config_prod
+          userName: ${DbUserName}
+          password: ${DbUserPassword}
+          service:
+            enabled: true
+            type: ExternalName
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+                - matchExpressions:
+                    - key: nodegroup
+                      operator: In
+                      values:
+                        - platform
+        env: prod
 
 Outputs:
   Arn:

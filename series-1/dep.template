@@ -6,51 +6,67 @@ Metadata:
   LICENSE: Apache License Version 2.0
   AWS::CloudFormation::Interface:
     ParameterGroups:
-    - Label:
-        default: DEP Basic Configuration
-      Parameters:
-        - EnvironmentName
+      - Label:
+          default: DEP Basic Configuration
+        Parameters:
+          - EnvironmentName
+          - CliUsername
 
-    - Label:
-        default: VPC Network Configuration
-      Parameters:
-        - VpcCIDR
-        - PrivateSubnet1CIDR
-        - PrivateSubnet2CIDR
-        - PublicSubnet1CIDR
-        - PublicSubnet2CIDR
-        - RemoteAccessCIDR
-        - AccessCIDR
+      - Label:
+          default: VPC Network Configuration
+        Parameters:
+          - VpcCIDR
+          - PrivateSubnet1CIDR
+          - PrivateSubnet2CIDR
+          - PublicSubnet1CIDR
+          - PublicSubnet2CIDR
+          - RemoteAccessCIDR
+          - AccessCIDR
 
-    - Label:
-        default: S3 Configuration
-      Parameters:
-        - S3BucketName
+      - Label:
+          default: S3 Configuration
+        Parameters:
+          - S3BucketName
 
-    - Label:
-        default: MySQL Configuration
-      Parameters:
-        - DBAllocatedStorage
-        - DBAutoMinorVersionUpgrade
-        - DBBackupRetentionPeriod
-        - DBInstanceClass
-        - DBIops
-        - DBMasterUsername
-        - DBMasterUserPassword
-        - DBMultiAZ
-        - DBStorageType
+      - Label:
+          default: MySQL Configuration
+        Parameters:
+          - DBAllocatedStorage
+          - DBAutoMinorVersionUpgrade
+          - DBBackupRetentionPeriod
+          - DBInstanceClass
+          - DBIops
+          - DBMasterUsername
+          - DBMasterUserPassword
+          - DBMultiAZ
+          - DBStorageType
 
-    - Label:
-        default: Ldap Configuration
-      Parameters:
-        - LdapDomainName
-        - LdapAdmin
-        - LdapAdminPassword
+      - Label:
+          default: Ldap Configuration
+        Parameters:
+          - LdapDomainName
+          - LdapAdmin
+          - LdapAdminPassword
+          - LdapUser
+          - LdapUserPassword
+
+      - Label:
+          default: Redis Configuration
+        Parameters:
+          - RedisPassword
+
+      - Label:
+          default: Others
+        Parameters:
+          - RangerPassword
 
     ParameterLabels:
       # DEP Basic Configuration
       EnvironmentName:
         default: Set your Dep application name.
+      # Cli username
+      CliUsername:
+        default: The aws username to grant eks cli access to.
 
       # VPC Network Configuration
       VpcCIDR:
@@ -99,12 +115,27 @@ Metadata:
         default: Ldap admin username.
       LdapAdminPassword:
         default: Ldap admin password.
+      LdapUser:
+        default: Ldap user to grant admin access to.
+      LdapUserPassword:
+        default: Password for Ldap user to grant admin access to.
+
+      # Redis Configuration
+      RedisPassword:
+        default: Redis root password.
+
+      RangerPassword:
+        default: Admin password for ranger.
 
 Parameters:
   # DEP Basic Configuration
   EnvironmentName:
     Description: Set your dep application name.
     Default: dep
+    Type: String
+
+  CliUsername:
+    Description: The aws username to grant eks cli access to.
     Type: String
 
   # VPC Network Configuration
@@ -241,11 +272,29 @@ Parameters:
   LdapAdmin:
     Description: Ldap admin username.
     Type: String
-    Default: 'depadmin'
+    Default: 'admin'
   LdapAdminPassword:
     Description: Ldap admin password.
     Type: String
+    Default: 'admin123456'
+  LdapUser:
+    Description: Ldap user to grant admin access to.
+    Type: String
+    Default: 'depadmin'
+  LdapUserPassword:
+    Description: Password for Ldap user to grant admin access to.
+    Type: String
     Default: 'dep123456'
+
+  RedisPassword:
+    Description: Redis root password.
+    Type: String
+    Default: 'depredis123456'
+
+  RangerPassword:
+    Description: Admin password for ranger.
+    Type: String
+    Default: 'dqwW988Ca012n4!'
 
 Conditions:
   CustomS3BucketName: !Not [!Equals ['', !Ref S3BucketName]]
@@ -362,9 +411,13 @@ Resources:
         LdapDomainName: !Ref LdapDomainName
         LdapAdmin: !Ref LdapAdmin
         LdapAdminPassword: !Ref LdapAdminPassword
+        LdapUser: !Ref LdapUser
+        LdapUserPassword: !Ref LdapUserPassword
+        RedisPassword: !Ref RedisPassword
+        CliUsername: !Ref CliUsername
+        RangerPassword: !Ref RangerPassword
 
-
-# Use lambda function to initialize database
+  # Use lambda function to initialize database
   LambdaLayer:
     Type: AWS::Lambda::LayerVersion
     Properties:
@@ -410,9 +463,14 @@ Resources:
           RDS_ENDPOINT: !GetAtt DepDBInstanceStack.Outputs.RDSEndPointAddress
           USERNAME: !Ref DBMasterUsername
           PASSWORD: !Ref DBMasterUserPassword
+          ADMIN_USERNAME: !Ref LdapUser
 
   LambdaInvokerStack:
     Type: AWS::Serverless::Function
+    DependsOn:
+      - DepIamStack
+      - DepDBInstanceStack
+      - LambdaLayer
     Properties:
       Handler: index.handler
       Runtime: nodejs16.x
@@ -426,6 +484,10 @@ Resources:
 
   CustomInvoker:
     Type: AWS::CloudFormation::CustomResource
+    DependsOn:
+      - DepIamStack
+      - DepDBInstanceStack
+      - LambdaLayer
     Version: "1.0"
     Properties:
       ServiceToken: !GetAtt LambdaInvokerStack.Arn
