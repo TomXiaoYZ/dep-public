@@ -506,6 +506,8 @@ Resources:
       ValueYaml: !Sub |
         server:
           workers: 4
+          exchangeManager:
+            baseDir: s3://${S3BucketName}/trino/
         additionalCatalogs:
           hive: |-
             hive.metastore-refresh-interval=1m
@@ -529,6 +531,10 @@ Resources:
           - retry-max-delay=1m
           - retry-delay-scale-factor=2.0
           - fault-tolerant-execution-task-descriptor-storage-max-memory=10GB
+        additionalExchangeManagerProperties:
+          - exchange.s3.region=${AWS::Region}
+        domain_database: ${LdapDomainName}
+        domain_username: ${LdapUser}
 
 #        server:
 #          config:
@@ -738,77 +744,77 @@ Resources:
                       values:
                         - platform
 
-  DepAuthService:
-    Type: AWSQS::Kubernetes::Helm
-    DependsOn:
-      - EbsCsiAddon
-      - EksCluster
-      - ClusterNamespace
-      - PlatformNodeGroup
-      - ApolloPortal
-      - ApolloProdService
-      - NacosService
-      - RedisService
-      - PrometheusPushGatewayService
-    Properties:
-      ClusterID: !Ref EksCluster
-      Repository: https://tomxiaoyz.github.io/big-data-platform-public/
-      Chart: dep/auth
-      Namespace: platform
-      Name: dep-auth
-      Version: 1.0.0
-      ValueYaml: !Sub |
-        fullnameOverride: dep-auth
-        spring:
-          profiles:
-            active: prod
-          application:
-            name: dep-auth
-          cloud:
-            nacos:
-              discovery:
-                enabled: true
-                server_addr: nacos-cs.platform.svc.cluster.local
-          datasource:
-            url: jdbc:mysql://${DbEndpoint}:3306/scheduler
-            username: ${DbUserName}
-            password: ${DbUserPassword}
-          redis:
-            password: ${RedisPassword}
-            host: redis-master.platform.svc.cluster.local
-            port: 6379
-        management:
-          metrics:
-            export:
-              prometheus:
-                pushgateway:
-                  baseUrl: http://prometheus-pushgateway.platform.svc.cluster.local:9091
-        app:
-          id: dep-auth
-        apollo:
-          meta: http://apollo-service-prod-apollo-configservice.platform.svc.cluster.local:8080
-          bootstrap:
-            enabled: true
-            eagerLoad:
-              enabled: true
-        ldap:
-          base_dn: dc=${LdapDomainName},dc=com
-          user_dn: cn=${LdapAdmin},dc=${LdapDomainName},dc=com
-          password: ${LdapAdminPassword}
-          url: ldap://openldap.platform.svc.cluster.local:389
-          user:
-            base_dn: ou=People,dc=${LdapDomainName},dc=com
-          auto:
-            fresh: true
-        affinity:
-          nodeAffinity:
-            requiredDuringSchedulingIgnoredDuringExecution:
-              nodeSelectorTerms:
-                - matchExpressions:
-                    - key: nodegroup
-                      operator: In
-                      values:
-                        - platform
+#  DepAuthService:
+#    Type: AWSQS::Kubernetes::Helm
+#    DependsOn:
+#      - EbsCsiAddon
+#      - EksCluster
+#      - ClusterNamespace
+#      - PlatformNodeGroup
+#      - ApolloPortal
+#      - ApolloProdService
+#      - NacosService
+#      - RedisService
+#      - PrometheusPushGatewayService
+#    Properties:
+#      ClusterID: !Ref EksCluster
+#      Repository: https://tomxiaoyz.github.io/big-data-platform-public/
+#      Chart: dep/auth
+#      Namespace: platform
+#      Name: dep-auth
+#      Version: 1.0.0
+#      ValueYaml: !Sub |
+#        fullnameOverride: dep-auth
+#        spring:
+#          profiles:
+#            active: prod
+#          application:
+#            name: dep-auth
+#          cloud:
+#            nacos:
+#              discovery:
+#                enabled: true
+#                server_addr: nacos-cs.platform.svc.cluster.local
+#          datasource:
+#            url: jdbc:mysql://${DbEndpoint}:3306/scheduler
+#            username: ${DbUserName}
+#            password: ${DbUserPassword}
+#          redis:
+#            password: ${RedisPassword}
+#            host: redis-master.platform.svc.cluster.local
+#            port: 6379
+#        management:
+#          metrics:
+#            export:
+#              prometheus:
+#                pushgateway:
+#                  baseUrl: http://prometheus-pushgateway.platform.svc.cluster.local:9091
+#        app:
+#          id: dep-auth
+#        apollo:
+#          meta: http://apollo-service-prod-apollo-configservice.platform.svc.cluster.local:8080
+#          bootstrap:
+#            enabled: true
+#            eagerLoad:
+#              enabled: true
+#        ldap:
+#          base_dn: dc=${LdapDomainName},dc=com
+#          user_dn: cn=${LdapAdmin},dc=${LdapDomainName},dc=com
+#          password: ${LdapAdminPassword}
+#          url: ldap://openldap.platform.svc.cluster.local:389
+#          user:
+#            base_dn: ou=People,dc=${LdapDomainName},dc=com
+#          auto:
+#            fresh: true
+#        affinity:
+#          nodeAffinity:
+#            requiredDuringSchedulingIgnoredDuringExecution:
+#              nodeSelectorTerms:
+#                - matchExpressions:
+#                    - key: nodegroup
+#                      operator: In
+#                      values:
+#                        - platform
 
 #  DepIdeService:
 #    Type: AWSQS::Kubernetes::Helm
@@ -831,6 +837,7 @@ Resources:
 #      Version: 1.0.0
 #      ValueYaml: !Sub |
 #        fullnameOverride: dep-ide
+#        replicaCount: 1
 #        server:
 #          port: 8080
 #        spring:
@@ -871,15 +878,15 @@ Resources:
 #        hive:
 #          driver: org.apache.hive.jdbc.HiveDriver
 #          url: jdbc:hive2://hadoop-hadoop-hive.hadoop.svc.cluster.local:10000
-#          userName: ${LdapAdmin}
-#          password: ${LdapAdminPassword}
+#          username: ${LdapUser}
+#          password: ${LdapUserPassword}
 #          ide_url: jdbc:hive2://hadoop-hadoop-hive.hadoop.svc.cluster.local:10000
-#          ide_userName: ${LdapAdmin}
+#          ide_userName: ${LdapUser}
 #          ldap:
 #            enable: true
 #        trino:
 #          ldap:
-#            enable: true
+#            enable: false
 #          driver: io.trino.jdbc.TrinoDriver
 #          url: jdbc:trino://trino.trino.svc.cluster.local:8080/hive
 #        webide:
@@ -893,7 +900,6 @@ Resources:
 #            hive: 10000
 #            presto: 5000
 #          cache_size: 10
-#
 #        k2:
 #          datadownload:
 #            whitelist:
