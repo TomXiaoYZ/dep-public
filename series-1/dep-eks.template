@@ -536,52 +536,6 @@ Resources:
         domain_database: ${LdapDomainName}
         domain_username: ${LdapUser}
 
-  #        server:
-  #          config:
-  #            authenticationType: "LDAP"
-  #        additionalConfigProperties:
-  #          - internal-communication.https.required=true
-  #          - internal-communication.shared-secret=${AWS::StackId}
-  #        ldap:
-  #          url: "ldap://openldap.platform.svc.cluster.local:389"
-  #          domain_name: "${LdapDomainName}"
-
-
-  ApolloProdService:
-    Type: AWSQS::Kubernetes::Helm
-    DependsOn:
-      - EbsCsiAddon
-      - EksCluster
-      - ClusterNamespace
-      - PlatformNodeGroup
-    Properties:
-      ClusterID: !Ref EksCluster
-      Repository: https://tomxiaoyz.github.io/big-data-platform-public/
-      Chart: dep/apollo-service
-      Namespace: platform
-      Name: apollo-service
-      Version: 1.0.0
-      ValueYaml: !Sub |
-        configdb:
-          host: ${DbEndpoint}
-          port: ${DbPort}
-          dbName: apollo_config_prod
-          userName: ${DbUserName}
-          password: ${DbUserPassword}
-          service:
-            enabled: true
-            type: ExternalName
-        affinity:
-          nodeAffinity:
-            requiredDuringSchedulingIgnoredDuringExecution:
-              nodeSelectorTerms:
-                - matchExpressions:
-                    - key: nodegroup
-                      operator: In
-                      values:
-                        - platform
-        env: prod
-
 Outputs:
   Arn:
     Description: The ARN of the cluster, such as arn:aws:eks:us-west-2:666666666666:cluster/prod.
