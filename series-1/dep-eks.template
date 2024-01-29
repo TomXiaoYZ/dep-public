@@ -496,6 +496,7 @@ Resources:
       - ClusterNamespace
       - TrinoNodeGroup
       - OpenldapService
+      - RangerService
     Properties:
       ClusterID: !Ref EksCluster
       Repository: https://tomxiaoyz.github.io/big-data-platform-public/
