@@ -1,0 +1,490 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Create Dep kubernetes resources.'
+Parameters:
+  # EKS Cluster Configuration
+  EnvironmentName:
+    Type: String
+  LambdaRoleArn:
+    Type: String
+  ClusterRoleArn:
+    Type: String
+  WorkerRoleArn:
+    Type: String
+  SecurityGroupIds:
+    Type: String
+  PrivateSubnet1Id:
+    Type: String
+  PrivateSubnet2Id:
+    Type: String
+  PublicSubnet1Id:
+    Type: String
+  PublicSubnet2Id:
+    Type: String
+  VpcCIDR:
+    Type: String
+
+  # EKS Nodegroup Configuration
+  AmiType:
+    Description: The AMI type for your node group.
+    Type: String
+  CapacityType:
+    Description: The capacity type of your managed node group.
+    Type: String
+  DiskSize:
+    Description: The root device disk size (in GiB) for your node group instances.
+    Type: Number
+    Default: 100
+  ForceUpdateEnabled:
+    Description: Force the update if the existing node group's pods are unable to be drained due to a pod disruption budget issue.
+    Type: String
+    Default: false
+  InstanceTypes:
+    Description: Specify the instance types for a node group.
+    Type: String
+  Ec2SshKey:
+    Description: The Amazon EC2 SSH key name that provides access for SSH communication with the nodes in the managed node group.
+    Type: String
+
+  # MySql Configuration
+  DbEndpoint:
+    Type: String
+  DbPort:
+    Type: String
+  DbUserName:
+    Type: String
+  DbUserPassword:
+    Type: String
+  S3BucketName:
+    Type: String
+
+  # LDAP Configuration
+  LdapDomainName:
+    Description: Ldap domain name.
+    Type: String
+  LdapAdmin:
+    Description: Ldap admin username.
+    Type: String
+  LdapAdminPassword:
+    Description: Ldap admin password.
+    Type: String
+  LdapUser:
+    Description: Ldap user to grant admin access to.
+    Type: String
+    Default: 'depadmin'
+  LdapUserPassword:
+    Description: Password for Ldap user to grant admin access to.
+    Type: String
+    Default: 'dep123456'
+
+  # Redis Configuration
+  RedisPassword:
+    Description: Redis password.
+    Type: String
+
+  CliUsername:
+    Description: The aws username to grant eks cli access to.
+    Type: String
+
+  RangerPassword:
+    Description: Admin password for ranger.
+    Type: String
+
+Resources:
+  EksCluster:
+    Type: AWSQS::EKS::Cluster
+    Properties:
+      Name: !Join
+        - '-'
+        - - !Ref EnvironmentName
+          - eks-cluster
+          - !Ref AWS::Region
+      Version: 1.28
+      LambdaRoleName: !Ref LambdaRoleArn
+      RoleArn: !Ref ClusterRoleArn
+      ResourcesVpcConfig:
+        SubnetIds:
+          - !Ref PrivateSubnet1Id
+          - !Ref PrivateSubnet2Id
+          - !Ref PublicSubnet1Id
+          - !Ref PublicSubnet2Id
+        SecurityGroupIds:
+          - !Ref SecurityGroupIds
+        EndpointPrivateAccess: true
+        EndpointPublicAccess: true
+      EnabledClusterLoggingTypes: ["audit"]
+      KubernetesApiAccess:
+        Roles:
+          # nodeRole so the extension can update the kubernetes api access
+          - Arn: !Ref LambdaRoleArn
+            Username: "Lambda"
+            Groups: [ "aws-auth-admin" ]
+          - Arn: !Ref ClusterRoleArn
+            Username: "Admin"
+            Groups: ["system:masters", "kube-system:aws-auth" ]
+          - Arn: !Ref WorkerRoleArn
+            Username: "Worker"
+            Groups: [ "system:masters", "kube-system:aws-auth", "system:nodes" ]
+          ## Temporary use
+          - Arn: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:user/${CliUsername}"
+            Username: "CliUser"
+            Groups: [ "system:masters", "kube-system:aws-auth" ]
+      Tags:
+        - Key: ClusterName
+          Value: !Join
+            - '-'
+            - - !Ref EnvironmentName
+              - eks-cluster
+
+  EbsCsiAddon:
+    Type: AWS::EKS::Addon
+    DependsOn:
+      - EksCluster
+    Properties:
+      AddonName: aws-ebs-csi-driver
+      ClusterName: !Ref EksCluster
+
+  PlatformNodeGroup:
+    Type: AWS::EKS::Nodegroup
+    Properties:
+      AmiType: !Ref AmiType
+      CapacityType: !Ref CapacityType
+      ClusterName: !Ref EksCluster
+      DiskSize: !Ref DiskSize
+      ForceUpdateEnabled: !Ref ForceUpdateEnabled
+      InstanceTypes:
+        - m6g.large
+        - m6g.xlarge
+        - m6g.2xlarge
+        - m6g.4xlarge
+        - r6g.2xlarge
+        - c6g.2xlarge
+        - c6gd.2xlarge
+        - c6g.large
+        - c6g.xlarge
+        - c6gn.xlarge
+      NodegroupName: platform
+      NodeRole: !Ref WorkerRoleArn
+      RemoteAccess:
+        Ec2SshKey: !Ref Ec2SshKey
+      ScalingConfig:
+        DesiredSize: 2
+        MaxSize: 5
+        MinSize: 2
+      Subnets:
+        - !Ref PublicSubnet1Id
+        - !Ref PublicSubnet2Id
+      Labels:
+        nodegroup: platform
+
+  HadoopNodeGroup:
+    Type: AWS::EKS::Nodegroup
+    Properties:
+      AmiType: !Ref AmiType
+      CapacityType: !Ref CapacityType
+      ClusterName: !Ref EksCluster
+      DiskSize: !Ref DiskSize
+      ForceUpdateEnabled: !Ref ForceUpdateEnabled
+      InstanceTypes:
+        - m6g.large
+        - m6g.xlarge
+        - m6g.2xlarge
+        - m6g.4xlarge
+        - r6g.2xlarge
+        - c6g.2xlarge
+        - c6gd.2xlarge
+        - c6g.large
+        - c6g.xlarge
+        - c6gn.xlarge
+      NodegroupName: hadoop
+      NodeRole: !Ref WorkerRoleArn
+      RemoteAccess:
+        Ec2SshKey: !Ref Ec2SshKey
+      ScalingConfig:
+        DesiredSize: 2
+        MaxSize: 5
+        MinSize: 2
+      Subnets:
+        - !Ref PublicSubnet1Id
+        - !Ref PublicSubnet2Id
+      Labels:
+        nodegroup: hadoop
+
+  TrinoNodeGroup:
+    Type: AWS::EKS::Nodegroup
+    Properties:
+      AmiType: !Ref AmiType
+      CapacityType: !Ref CapacityType
+      ClusterName: !Ref EksCluster
+      DiskSize: !Ref DiskSize
+      ForceUpdateEnabled: !Ref ForceUpdateEnabled
+      InstanceTypes:
+        - m6g.large
+        - m6g.xlarge
+        - m6g.2xlarge
+        - m6g.4xlarge
+        - r6g.2xlarge
+        - c6g.2xlarge
+        - c6gd.2xlarge
+        - c6g.large
+        - c6g.xlarge
+        - c6gn.xlarge
+      NodegroupName: trino
+      NodeRole: !Ref WorkerRoleArn
+      RemoteAccess:
+        Ec2SshKey: !Ref Ec2SshKey
+      ScalingConfig:
+        DesiredSize: 2
+        MaxSize: 5
+        MinSize: 2
+      Subnets:
+        - !Ref PublicSubnet1Id
+        - !Ref PublicSubnet2Id
+      Labels:
+        nodegroup: trino
+
+  ClusterNamespace:
+    Type: AWSQS::Kubernetes::Resource
+    Properties:
+      ClusterName: !Ref EksCluster
+      Namespace: default
+      Manifest: |
+        ---
+        apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: platform
+        ---
+        apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: hadoop
+        ---
+        apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: trino
+
+  EbsStorageClass:
+    Type: AWSQS::Kubernetes::Resource
+    Properties:
+      ClusterName: !Ref EksCluster
+      Namespace: default
+      Manifest: |
+        ---
+        apiVersion: storage.k8s.io/v1
+        kind: StorageClass
+        metadata:
+          name: ebs-sc
+        provisioner: ebs.csi.aws.com
+        volumeBindingMode: WaitForFirstConsumer
+
+  ClusterAutoscaler:
+    Type: AWSQS::Kubernetes::Helm
+    DependsOn:
+      - EbsCsiAddon
+      - EksCluster
+      - ClusterNamespace
+      - PlatformNodeGroup
+      - HadoopNodeGroup
+      - TrinoNodeGroup
+    Properties:
+      ClusterID: !Ref EksCluster
+      Repository: https://tomxiaoyz.github.io/big-data-platform-public/
+      Chart: dep/cluster-autoscaler
+      Namespace: kube-system
+      Name: cluster-autoscaler
+      Version: 1.0.0
+      ValueYaml: !Sub |
+        autoDiscovery:
+          clusterName: ${EnvironmentName}-eks-cluster-${AWS::Region}
+        awsRegion: ${AWS::Region}
+
+  OpenldapService:
+    Type: AWSQS::Kubernetes::Helm
+    DependsOn:
+      - EbsCsiAddon
+      - EksCluster
+      - ClusterNamespace
+      - PlatformNodeGroup
+      - EbsStorageClass
+    Properties:
+      ClusterID: !Ref EksCluster
+      Repository: https://tomxiaoyz.github.io/big-data-platform-public/
+      Chart: dep/openldap
+      Namespace: platform
+      Name: openldap
+      Version: 1.0.0
+      ValueYaml: !Sub |
+        global:
+          ldapDomain: "dc=${LdapDomainName},dc=com"
+          adminUser: "${LdapAdmin}"
+          adminPassword: "${LdapAdminPassword}"
+          configUserEnabled: false
+          username: "${LdapUser}"
+          userPassword: "${LdapUserPassword}"
+        customLdifFiles:
+          00-root.ldif: |-
+            # Root creation
+            dn: dc=${LdapDomainName},dc=com
+            objectClass: dcObject
+            objectClass: organization
+            o: ${LdapDomainName}
+            dc: ${LdapDomainName}
+          01-users-group.ldif: |-
+            dn: ou=People,dc=${LdapDomainName},dc=com
+            ou: People
+            objectClass: organizationalUnit
+            objectClass: top
+        customAcls: |-
+          dn: olcDatabase={2}mdb,cn=config
+          changetype: modify
+          replace: olcAccess
+          olcAccess: {0}to *
+            by dn.exact=gidNumber=0+uidNumber=1001,cn=peercred,cn=external,cn=auth manage
+            by * break
+          olcAccess: {1}to attrs=userPassword,shadowLastChange
+            by self write
+            by dn="cn=${LdapAdmin},dc=${LdapDomainName},dc=com" write
+            by set="user/employeeType & [ldap_admin]" write
+            by anonymous auth by * none
+          olcAccess: {2}to *
+            by dn="cn=${LdapAdmin},dc=${LdapDomainName},dc=com" write
+            by set="user/employeeType & [ldap_admin]" write
+            by self read
+            by * none
+        persistence:
+          storageClass: ebs-sc
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+                - matchExpressions:
+                    - key: nodegroup
+                      operator: In
+                      values:
+                        - platform
+
+  RangerService:
+    Type: AWSQS::Kubernetes::Helm
+    DependsOn:
+      - EbsCsiAddon
+      - EksCluster
+      - ClusterNamespace
+      - PlatformNodeGroup
+      - OpenldapService
+    Properties:
+      ClusterID: !Ref EksCluster
+      Repository: https://tomxiaoyz.github.io/big-data-platform-public/
+      Chart: dep/ranger
+      Namespace: platform
+      Name: ranger
+      Version: 1.0.0
+      ValueYaml: !Sub |
+        env:
+          admin:
+            DB_HOST: ${DbEndpoint}
+            DB_ROOT_USER: ${DbUserName}
+            DB_ROOT_PASSWORD: ${DbUserPassword}
+            DB_NAME: ranger
+            DB_USER: ${DbUserName}
+            DB_PASSWORD: ${DbUserPassword}
+            AUDIT_SOLR_URLS: http://ranger-solr.platform.svc.cluster.local:8983/solr/ranger_audits
+            POLICYMGR_EXTERNAL_URL: http://ranger-admin.platform.svc.cluster.local:6080
+            XA_LDAP_URL: ldap://openldap.platform.svc.cluster.local:389
+            XA_LDAP_BASE_DN: dc=${LdapDomainName},dc=com
+            XA_LDAP_BIND_DN: cn=${LdapAdmin},dc=${LdapDomainName},dc=com
+            XA_LDAP_BIND_PASSWORD: ${LdapAdminPassword}
+            LDAP_USER: ${LdapUser}
+            LDAP_PASSWORD: ${LdapUserPassword}
+            RANGER_PASSWORD: ${RangerPassword}
+          usersync:
+            POLICY_MGR_URL: http://ranger-admin.platform.svc.cluster.local:6080
+            SYNC_SOURCE: ldap
+            SYNC_LDAP_URL: ldap://openldap.platform.svc.cluster.local:389
+            SYNC_LDAP_BIND_DN: cn=${LdapAdmin},dc=${LdapDomainName},dc=com
+            SYNC_LDAP_BIND_PASSWORD: ${LdapAdminPassword}
+            SYNC_LDAP_SEARCH_BASE: dc=${LdapDomainName},dc=com
+            SYNC_LDAP_USER_SEARCH_BASE: ou=People,dc=${LdapDomainName},dc=com
+            SYNC_LDAP_USER_NAME_ATTRIBUTE: cn
+
+  HiveMetastoreService:
+    Type: AWSQS::Kubernetes::Helm
+    DependsOn:
+      - EbsCsiAddon
+      - EksCluster
+      - ClusterNamespace
+      - HadoopNodeGroup
+    Properties:
+      ClusterID: !Ref EksCluster
+      Repository: https://tomxiaoyz.github.io/big-data-platform-public/
+      Chart: dep/hive-metastore
+      Version: 1.0.0
+      Namespace: hadoop
+      Name: hive-metastore
+      ValueYaml: !Sub |
+        env:
+          HIVE_DB_JDBC_URL: "jdbc:mysql://${DbEndpoint}:${DbPort}/hive"
+          HIVE_DB_USER: "${DbUserName}"
+          HIVE_DB_PASS: "${DbUserPassword}"
+          HIVE_WAREHOUSE_S3LOCATION: "s3://${S3BucketName}/hive/"
+
+  RedisService:
+    Type: AWSQS::Kubernetes::Helm
+    DependsOn:
+      - EbsCsiAddon
+      - EksCluster
+      - ClusterNamespace
+      - PlatformNodeGroup
+    Properties:
+      ClusterID: !Ref EksCluster
+      Repository: https://tomxiaoyz.github.io/big-data-platform-public/
+      Chart: redis
+      Namespace: platform
+      Name: redis
+      Version: 1.0.0
+      ValueYaml: !Sub |
+        global:
+          redis:
+            password: ${RedisPassword}
+        master:
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: nodegroup
+                        operator: In
+                        values:
+                          - platform
+        replica:
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: nodegroup
+                        operator: In
+                        values:
+                          - platform
+
+Outputs:
+  Arn:
+    Description: The ARN of the cluster, such as arn:aws:eks:us-west-2:666666666666:cluster/prod.
+    Value: !GetAtt EksCluster.Arn
+  CertificateAuthorityData:
+    Description: The certificate-authority-data for your cluster.
+    Value: !GetAtt EksCluster.CertificateAuthorityData
+  ClusterSecurityGroupId:
+    Description: The cluster security group that was created by Amazon EKS for the cluster.
+      Managed node groups use this security group for control plane to data plane communication.
+    Value: !GetAtt EksCluster.ClusterSecurityGroupId
+  Endpoint:
+    Description: The endpoint for your Kubernetes API server,
+      such as https://5E1D0CEXAMPLEA591B746AFC5AB30262.yl4.us-west-2.eks.amazonaws.com.
+    Value: !GetAtt EksCluster.Endpoint
+  Name:
+    Description: EKS cluster name
+    Value: !Ref EksCluster
+  OIDCIssuerURL:
+    Description: The issuer URL for the OIDC identity provider.
+    Value: !GetAtt EksCluster.OIDCIssuerURL

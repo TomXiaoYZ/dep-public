@@ -422,7 +422,7 @@ Resources:
     Type: AWS::Lambda::LayerVersion
     Properties:
       CompatibleRuntimes:
-        - python3.7
+        - python3.8
       Content:
         S3Bucket: dep-public
         S3Key: lambda/python.zip
@@ -441,7 +441,7 @@ Resources:
     Properties:
       Handler: index.handler
       Description: Dep database initialization.
-      Runtime: python3.7
+      Runtime: python3.8
       FunctionName: !Sub ${EnvironmentName}-db-init-lambda-function
       Role: !GetAtt DepIamStack.Outputs.DepIamRole
       Timeout: 60

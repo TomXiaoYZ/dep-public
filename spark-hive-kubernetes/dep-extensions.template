@@ -1,0 +1,193 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Extensions
+Resources:
+  # AWSQS::EKS::Cluster
+  AWSQSEKSClusterExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join
+        - '-'
+        - - 'AWSQSExecutionIAMRole'
+          - !Select [2, !Split [ '/', !Ref AWS::StackId ]]
+      MaxSessionDuration: 8400
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - resources.cloudformation.amazonaws.com
+            - cloudformation.amazonaws.com
+            - lambda.amazonaws.com
+          Action: sts:AssumeRole
+      Path: '/'
+      Policies:
+      - PolicyName: !Join
+          - '-'
+          - - 'AWSQSExecutionIAMRole'
+            - 'policy'
+            - !Select [2, !Split [ '/', !Ref AWS::StackId ]]
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - sts:GetCallerIdentity
+            - eks:CreateCluster
+            - eks:DeleteCluster
+            - eks:DescribeCluster
+            - eks:ListTagsForResource
+            - eks:UpdateClusterVersion
+            - eks:UpdateClusterConfig
+            - eks:TagResource
+            - eks:UntagResource
+            - lambda:UpdateFunctionConfiguration
+            - lambda:DeleteFunction
+            - lambda:GetFunction
+            - lambda:InvokeFunction
+            - lambda:CreateFunction
+            - lambda:UpdateFunctionCode
+            - ec2:DescribeVpcs
+            - ec2:DescribeSubnets
+            - ec2:DescribeSecurityGroups
+            - kms:CreateGrant
+            - kms:DescribeKey
+            Resource:
+            - '*'
+          - Effect: Allow
+            Action:
+            - iam:PassRole
+            Resource:
+            - !Sub arn:aws:iam::${AWS::AccountId}:role/*
+            Condition:
+              StringEquals:
+                iam:PassedToService:
+                - eks.amazonaws.com
+                - lambda.amazonaws.com
+              StringLike:
+                iam:AssociatedResourceArn:
+                - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:*
+                - !Sub arn:aws:eks:${AWS::Region}:${AWS::AccountId}:cluster/*
+      Tags:
+      - Key: Name
+        Value: !Join
+          - '-'
+          - - 'AWSQSExecutionIAMRole'
+            - !Select [2, !Split [ '/', !Ref AWS::StackId ]]
+
+  AWSQSEKSClusterLogDeliveryRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join
+        - '-'
+        - - 'AWSQSLogDeliveryIAMRole'
+          - !Select [2, !Split [ '/', !Ref AWS::StackId ]]
+      MaxSessionDuration: 8400
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - resources.cloudformation.amazonaws.com
+            - cloudformation.amazonaws.com
+          Action: sts:AssumeRole
+      Path: '/'
+      Policies:
+      - PolicyName: !Join
+          - '-'
+          - - 'AWSQSLogDeliveryIAMRole'
+            - 'policy'
+            - !Select [2, !Split [ '/', !Ref AWS::StackId ]]
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:DescribeLogGroups
+            - logs:DescribeLogStreams
+            - logs:PutLogEvents
+            - cloudwatch:ListMetrics
+            - cloudwatch:PutMetricData
+            Resource:
+            - '*'
+      Tags:
+      - Key: Name
+        Value: !Join
+          - '-'
+          - - 'AWSQSLogDeliveryIAMRole'
+            - !Select [2, !Split [ '/', !Ref AWS::StackId ]]
+
+  AWSQSEKSClusterResourceVersion:
+    Type: AWS::CloudFormation::ResourceVersion
+    Properties:
+      TypeName: AWSQS::EKS::Cluster
+      ExecutionRoleArn: !GetAtt AWSQSEKSClusterExecutionRole.Arn
+      LoggingConfig:
+        LogGroupName: !Join
+          - '-'
+          - - '/aws/cloudformation/registry/AWSQSEKSClusterLogGroup'
+            - !Select [2, !Split [ '/', !Ref AWS::StackId ]]
+        LogRoleArn: !GetAtt AWSQSEKSClusterLogDeliveryRole.Arn
+      SchemaHandlerPackage: 'https://dep-public.s3.ap-northeast-1.amazonaws.com/extensions/awsqs-eks-cluster.zip'
+
+  AWSQSEKubernetesHelmVersion:
+    Type: AWS::CloudFormation::ResourceVersion
+    Properties:
+      TypeName: AWSQS::Kubernetes::Helm
+      ExecutionRoleArn: !GetAtt AWSQSEKSClusterExecutionRole.Arn
+      LoggingConfig:
+        LogGroupName: !Join
+          - '-'
+          - - '/aws/cloudformation/registry/AWSQSEKSClusterLogGroup'
+            - !Select [2, !Split [ '/', !Ref AWS::StackId ]]
+        LogRoleArn: !GetAtt AWSQSEKSClusterLogDeliveryRole.Arn
+      SchemaHandlerPackage: 'https://dep-public.s3.ap-northeast-1.amazonaws.com/extensions/awsqs-kubernetes-helm.zip'
+
+  AWSQSEKubernetesResourceVersion:
+    Type: AWS::CloudFormation::ResourceVersion
+    Properties:
+      TypeName: AWSQS::Kubernetes::Resource
+      ExecutionRoleArn: !GetAtt AWSQSEKSClusterExecutionRole.Arn
+      LoggingConfig:
+        LogGroupName: !Join
+          - '-'
+          - - '/aws/cloudformation/registry/AWSQSEKSClusterLogGroup'
+            - !Select [2, !Split [ '/', !Ref AWS::StackId ]]
+        LogRoleArn: !GetAtt AWSQSEKSClusterLogDeliveryRole.Arn
+      SchemaHandlerPackage: 'https://dep-public.s3.ap-northeast-1.amazonaws.com/extensions/awsqs-kubernetes-apply.zip'
+
+  AWSQSEKubernetesResourceGetVersion:
+    Type: AWS::CloudFormation::ResourceVersion
+    Properties:
+      TypeName: AWSQS::Kubernetes::Get
+      ExecutionRoleArn: !GetAtt AWSQSEKSClusterExecutionRole.Arn
+      LoggingConfig:
+        LogGroupName: !Join
+          - '-'
+          - - '/aws/cloudformation/registry/AWSQSEKSClusterLogGroup'
+            - !Select [2, !Split [ '/', !Ref AWS::StackId ]]
+        LogRoleArn: !GetAtt AWSQSEKSClusterLogDeliveryRole.Arn
+      SchemaHandlerPackage: 'https://dep-public.s3.ap-northeast-1.amazonaws.com/extensions/awsqs-kubernetes-get.zip'
+
+  AWSQSEKSClusterResourceDefaultVersion:
+    Type: AWS::CloudFormation::ResourceDefaultVersion
+    Properties:
+      TypeVersionArn: !Ref AWSQSEKSClusterResourceVersion
+
+  AWSQSEKubernetesHelmDefaultVersion:
+    Type: AWS::CloudFormation::ResourceDefaultVersion
+    Properties:
+      TypeVersionArn: !Ref AWSQSEKubernetesHelmVersion
+
+  AWSQSEKubernetesResourceDefaultVersion:
+    Type: AWS::CloudFormation::ResourceDefaultVersion
+    Properties:
+      TypeVersionArn: !Ref AWSQSEKubernetesResourceVersion
+
+  AWSQSEKubernetesResourceGetDefaultVersion:
+    Type: AWS::CloudFormation::ResourceDefaultVersion
+    Properties:
+      TypeVersionArn: !Ref AWSQSEKubernetesResourceGetVersion

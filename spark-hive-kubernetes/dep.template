@@ -303,7 +303,7 @@ Resources:
   DepVpcStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: 'https://dep-public.s3.ap-northeast-1.amazonaws.com/series-2/dep-vpc.template'
+      TemplateURL: 'https://dep-public.s3.ap-northeast-1.amazonaws.com/spark-hive-kubernetes/dep-vpc.template'
       Parameters:
         EnvironmentName: !Ref EnvironmentName
         PrivateSubnet1CIDR: !Ref PrivateSubnet1CIDR
@@ -317,7 +317,7 @@ Resources:
     DependsOn:
       - DepVpcStack
     Properties:
-      TemplateURL: 'https://dep-public.s3.ap-northeast-1.amazonaws.com/series-2/dep-securitygroup.template'
+      TemplateURL: 'https://dep-public.s3.ap-northeast-1.amazonaws.com/spark-hive-kubernetes/dep-securitygroup.template'
       Parameters:
         EnvironmentName: !Ref EnvironmentName
         AccessCIDR: !GetAtt DepVpcStack.Outputs.CidrBlock
@@ -327,7 +327,7 @@ Resources:
   DepS3Stack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: 'https://dep-public.s3.ap-northeast-1.amazonaws.com/series-2/dep-s3.template'
+      TemplateURL: 'https://dep-public.s3.ap-northeast-1.amazonaws.com/spark-hive-kubernetes/dep-s3.template'
       Parameters:
         BucketName: !If [CustomS3BucketName, !Ref S3BucketName, !Join ['-', [!Ref EnvironmentName, !Ref AWS::AccountId, !Ref AWS::Region]]]
 
@@ -336,7 +336,7 @@ Resources:
     DependsOn:
       - DepS3Stack
     Properties:
-      TemplateURL: 'https://dep-public.s3.ap-northeast-1.amazonaws.com/series-2/dep-iam.template'
+      TemplateURL: 'https://dep-public.s3.ap-northeast-1.amazonaws.com/spark-hive-kubernetes/dep-iam.template'
       Parameters:
         EnvironmentName: !Ref EnvironmentName
         S3BucketName: !GetAtt DepS3Stack.Outputs.BucketName
@@ -350,7 +350,7 @@ Resources:
   DepCloudformationExtensionsStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: 'https://dep-public.s3.ap-northeast-1.amazonaws.com/series-2/dep-extensions.template'
+      TemplateURL: 'https://dep-public.s3.ap-northeast-1.amazonaws.com/spark-hive-kubernetes/dep-extensions.template'
 
   DepDBInstanceStack:
     Type: AWS::CloudFormation::Stack
@@ -358,7 +358,7 @@ Resources:
       - DepVpcStack
       - DepSecurityGroupStack
     Properties:
-      TemplateURL: 'https://dep-public.s3.ap-northeast-1.amazonaws.com/series-2/dep-mysql.template'
+      TemplateURL: 'https://dep-public.s3.ap-northeast-1.amazonaws.com/spark-hive-kubernetes/dep-mysql.template'
       Parameters:
         DBInstanceIdentifier: !Join
           - '-'
@@ -378,44 +378,44 @@ Resources:
         Subnet2ID: !GetAtt DepVpcStack.Outputs.PublicSubnet2
         VPCID: !GetAtt DepVpcStack.Outputs.VPC
 
-  DepEksStack:
-    Type: AWS::CloudFormation::Stack
-    DependsOn:
-      - DepVpcStack
-      - DepSecurityGroupStack
-      - DepIamStack
-      - DepCloudformationExtensionsStack
-      - DepDBInstanceStack
-    Properties:
-      TemplateURL: 'https://dep-public.s3.ap-northeast-1.amazonaws.com/series-2/dep-eks.template'
-      Parameters:
-        EnvironmentName: !Ref EnvironmentName
-        LambdaRoleArn: !GetAtt DepIamStack.Outputs.DepLambdaIamRole
-        ClusterRoleArn: !GetAtt DepIamStack.Outputs.DepIamRole
-        WorkerRoleArn: !GetAtt DepIamStack.Outputs.DepEksWorkerIamRole
-        SecurityGroupIds: !GetAtt DepSecurityGroupStack.Outputs.EKSSecurityGroup
-        PrivateSubnet1Id: !GetAtt DepVpcStack.Outputs.PrivateSubnet1
-        PrivateSubnet2Id: !GetAtt DepVpcStack.Outputs.PrivateSubnet2
-        PublicSubnet1Id: !GetAtt DepVpcStack.Outputs.PublicSubnet1
-        PublicSubnet2Id: !GetAtt DepVpcStack.Outputs.PublicSubnet2
-        VpcCIDR: !Ref VpcCIDR
-        AmiType: 'AL2_ARM_64'
-        CapacityType: 'SPOT'
-        InstanceTypes: 'm6g.large'
-        Ec2SshKey: !Ref DepEc2SshKeyPair
-        DbEndpoint: !GetAtt DepDBInstanceStack.Outputs.RDSEndPointAddress
-        DbPort: !GetAtt DepDBInstanceStack.Outputs.RDSEndPointPort
-        DbUserName: !Ref DBMasterUsername
-        DbUserPassword: !Ref DBMasterUserPassword
-        S3BucketName: !GetAtt DepS3Stack.Outputs.BucketName
-        LdapDomainName: !Ref LdapDomainName
-        LdapAdmin: !Ref LdapAdmin
-        LdapAdminPassword: !Ref LdapAdminPassword
-        LdapUser: !Ref LdapUser
-        LdapUserPassword: !Ref LdapUserPassword
-        RedisPassword: !Ref RedisPassword
-        CliUsername: !Ref CliUsername
-        RangerPassword: !Ref RangerPassword
+#  DepEksStack:
+#    Type: AWS::CloudFormation::Stack
+#    DependsOn:
+#      - DepVpcStack
+#      - DepSecurityGroupStack
+#      - DepIamStack
+#      - DepCloudformationExtensionsStack
+#      - DepDBInstanceStack
+#    Properties:
+#      TemplateURL: 'https://dep-public.s3.ap-northeast-1.amazonaws.com/spark-hive-kubernetes/dep-eks.template'
+#      Parameters:
+#        EnvironmentName: !Ref EnvironmentName
+#        LambdaRoleArn: !GetAtt DepIamStack.Outputs.DepLambdaIamRole
+#        ClusterRoleArn: !GetAtt DepIamStack.Outputs.DepIamRole
+#        WorkerRoleArn: !GetAtt DepIamStack.Outputs.DepEksWorkerIamRole
+#        SecurityGroupIds: !GetAtt DepSecurityGroupStack.Outputs.EKSSecurityGroup
+#        PrivateSubnet1Id: !GetAtt DepVpcStack.Outputs.PrivateSubnet1
+#        PrivateSubnet2Id: !GetAtt DepVpcStack.Outputs.PrivateSubnet2
+#        PublicSubnet1Id: !GetAtt DepVpcStack.Outputs.PublicSubnet1
+#        PublicSubnet2Id: !GetAtt DepVpcStack.Outputs.PublicSubnet2
+#        VpcCIDR: !Ref VpcCIDR
+#        AmiType: 'AL2_ARM_64'
+#        CapacityType: 'SPOT'
+#        InstanceTypes: 'm6g.large'
+#        Ec2SshKey: !Ref DepEc2SshKeyPair
+#        DbEndpoint: !GetAtt DepDBInstanceStack.Outputs.RDSEndPointAddress
+#        DbPort: !GetAtt DepDBInstanceStack.Outputs.RDSEndPointPort
+#        DbUserName: !Ref DBMasterUsername
+#        DbUserPassword: !Ref DBMasterUserPassword
+#        S3BucketName: !GetAtt DepS3Stack.Outputs.BucketName
+#        LdapDomainName: !Ref LdapDomainName
+#        LdapAdmin: !Ref LdapAdmin
+#        LdapAdminPassword: !Ref LdapAdminPassword
+#        LdapUser: !Ref LdapUser
+#        LdapUserPassword: !Ref LdapUserPassword
+#        RedisPassword: !Ref RedisPassword
+#        CliUsername: !Ref CliUsername
+#        RangerPassword: !Ref RangerPassword
 
 # Use lambda function to initialize database
   LambdaLayer:
